@@ -42,17 +42,16 @@ div.postReply div.postDate {
 
 div.postReply div.postContent {
 	padding : 10px;
-	font-size : 16px;
 }
 
-div.postReply div.postContent img,
-div.postReply div.postContent video {
+div.postReply div.postContent img {
 	border-width : 0px;
 	max-width : 98%;
 	height: auto;
 }
 
 div.postReply div.postEnclosures {
+	margin-top : 1em;
 	color : #555;
 }
 
@@ -131,13 +130,12 @@ hr {
 }
 
 a {
-	color: #0088cc;
-	text-decoration: none;
+	color : #4684ff;
+	text-decoration : none;
 }
 
 a:hover {
-	color: #005580;
-	text-decoration: underline;
+	color : #88b0f0;
 }
 
 #piggie {
@@ -180,8 +178,8 @@ a:hover {
 	width : 100%;
 }
 
-#notify img.close {
-	cursor : pointer;
+#notify span.close {
+	text-align : right;
 }
 
 #notify span {
@@ -201,7 +199,7 @@ a:hover {
 }
 
 .notify.notify_info {
-	border-color : rgb(82, 168, 236);
+	border-color : #88b0f0;
 	background-color : #ecf4ff;
 }
 
@@ -224,7 +222,7 @@ a:hover {
 }
 
 .hl.active div.hlTitle a {
-	color : rgb(82, 168, 236);
+	color : #4684ff;
 	/* text-shadow : 1px 1px 2px #fff; */
 }
 
@@ -253,6 +251,7 @@ div.filterTestHolder {
 	border-color : #ddd;
 	border-style : solid;
 	margin : 0px 0px 5px 0px;
+	background-color : #f5f5f5;
 	border-width : 1px;
 }
 
@@ -273,78 +272,58 @@ div.filterTestHolder {
 }
 
 #content-insert pre, #headlines-frame pre, .dijitContentPane pre {
-	margin: 5px 0px 5px 0px;
-	padding: 10px;
-	color: #555;
-	font-family: monospace;
-	font-size: 12px;
-	border-width: 0px;
-	border-color: #ccc;
-	border-style: solid;
-	background: #f5f5f5;
-	display: block;
-	max-width: 98%;
-	overflow: auto;
+	margin : 5px 0px 5px 0px;
+	padding : 10px;
+	color : #555;
+	font-family : monospace;
+	font-size : 12px;
+	border-width : 0px;
+	border-color : #ccc;
+	border-style : solid;
+	background : #f5f5f5;
+	display : block;
+	max-width : 98%;
+	overflow : auto;
 }
 
-.alert {
-	padding: 8px 35px 8px 14px;
-	margin-bottom: 10px;
-	text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-	background-color: #fcf8e3;
-	border: 1px solid #fbeed5;
-	-webkit-border-radius: 4px;
-	-moz-border-radius: 4px;
-	border-radius: 4px;
+div.notice, div.warning, div.error {
+	padding : 4px 10px 4px 4px;
+	display : inline-block;
+	margin : 2px 0px 4px 0px;
+	font-size : 12px;
+	border-style : solid;
+	border-color : #ccc;
+	border-width : 1px;
 }
 
-.alert,
-.alert h4 {
-	color: #c09853;
+div.notice div.inner, div.warning div.inner, div.error div.inner {
+	vertical-align : middle;
 }
 
-.alert h4 {
-	margin: 0;
+div.notice {
+	background : #ecf4ff;
+	border-color : #88b0f0;
 }
 
-.alert .close {
-	position: relative;
-	top: -2px;
-	right: -21px;
-	line-height: 20px;
-	cursor : pointer;
+div.warning {
+	background : #fff7d5;
+	border-color : #e7d796;;
 }
 
-.alert-success {
-	color: #468847;
-	background-color: #dff0d8;
-	border-color: #d6e9c6;
+div.error {
+	background : #ffcccc;
+	border-color : #ff0000;
 }
 
-.alert-success h4 {
-	color: #468847;
+div.warning img, div.notice img, div.error img {
+	margin : 4px;
+	vertical-align : middle;
 }
 
-.alert-danger,
-.alert-error {
-	color: #b94a48;
-	background-color: #f2dede;
-	border-color: #eed3d7;
-}
+div.warning span, div.notice span, div.error span {
+	display : table-cell;
+	vertical-align : middle;
 
-.alert-danger h4,
-.alert-error h4 {
-	color: #b94a48;
-}
-
-.alert-info {
-	color: #3a87ad;
-	background-color: #d9edf7;
-	border-color: #bce8f1;
-}
-
-.alert-info h4 {
-	color: #3a87ad;
 }
 
 ul.nomarks {
@@ -360,10 +339,6 @@ div.prefHelp {
 
 .insensitive {
 	color : #555;
-}
-
-.small {
-	font-size : 11px;
 }
 
 #main-toolbar > * {
@@ -419,12 +394,6 @@ div.prefHelp {
 	font-style : italic;
 	text-align : right;
 	margin-right : 4px;
-}
-
-@media (max-width: 992px) {
-	#main-toolbar #selected_prompt {
-		display : none;
-	}
 }
 
 span.contentPreview {
@@ -487,6 +456,7 @@ img[src*='pub_set.png'], img[src*='mark_set.png'] {
 
 div.tagCloudContainer {
 	border : 1px solid #ddd;
+	background-color : #f5f5f5;
 	margin : 5px 0px 5px 0px;
 	padding : 5px;
 	text-align : center;
@@ -494,6 +464,7 @@ div.tagCloudContainer {
 
 div.errorExplained {
 	border : 1px solid #ddd;
+	background-color : #f5f5f5;
 	margin : 5px 0px 5px 0px;
 	padding : 5px;
 }
@@ -503,6 +474,7 @@ ul.feedErrorsList {
 	overflow : auto;
 	list-style-type : none;
 	border : 1px solid #ddd;
+	background-color : #f5f5f5;
 	margin : 0px 0px 5px 0px;
 	padding : 5px;
 }
@@ -678,7 +650,7 @@ div.dlgSecCont {
 	font-weight : normal;
 }
 
-div.dlgSecCont hr, div.dlgSecSimple hr {
+div.dlgSecCont hr {
 	height : 0px;
 	line-height : 0px;
 	border : 0px solid transparent;
@@ -717,7 +689,7 @@ div#cmdline {
 	color : #555;
 	font-weight : bold;
 	background-color : white;
-	border : 1px solid rgb(82, 168, 236);
+	border : 1px solid #88b0f0;
 	padding : 3px 5px 3px 5px;
 	z-index : 5;
 }
@@ -773,7 +745,7 @@ div.hlRight img {
 }
 
 .hl span.hlFeed a:hover {
-	color : rgb(82, 168, 236);
+	color : #4684ff;
 }
 
 .hl span.hlUpdated {
@@ -817,8 +789,8 @@ div.fatalError button {
 }
 
 div.fatalError textarea {
-	width : 565px;
-	height : 200px;
+	width : 100%;
+	height : 100px;
 }
 
 #ttrssMain #main {
@@ -970,7 +942,7 @@ img.feedIcon, img.tinyFeedIcon {
 }
 
 #headlines-spacer a:hover {
-	color : rgb(82, 168, 236);
+	color : #88b0f0;
 }
 
 ul#filterDlg_Matches, ul#filterDlg_Actions {
@@ -995,6 +967,7 @@ ul.helpKbList {
 	overflow : auto;
 	list-style-type : none;
 	border : 1px solid #ddd;
+	background-color : #f5f5f5;
 	margin : 0px 0px 5px 0px;
 	padding : 5px;
 }
@@ -1002,7 +975,7 @@ ul.helpKbList {
 ul.helpKbList span.hksequence {
 	width : 6em;
 	margin-left : 20px;
-	color : rgb(82, 168, 236);
+	color : #88b0f0;
 	font-weight : bold;
 	display : inline-block;
 }
@@ -1013,10 +986,6 @@ ul.helpKbList h2 {
 
 span.collapseBtn {
 	cursor : pointer;
-}
-
-span.collapseBtn img {
-	vertical-align : middle;
 }
 
 div.postContent h1 {
@@ -1030,7 +999,7 @@ div.postContent h4 {
 }
 
 div.postContent p {
-	/*max-width : 650px;*/
+	max-width : 650px;
 	-webkit-hyphens: auto;
 	-moz-hyphens: auto;
 	hyphens: auto;
@@ -1038,7 +1007,6 @@ div.postContent p {
 
 div.postContent iframe {
 	min-width : 50%;
-	max-width : 98%;
 }
 
 div.postHeader span.author {
@@ -1055,43 +1023,18 @@ select.attachments {
 
 #selected_prompt {
 	margin-right : 25px;
-	vertical-align  : middle;
 }
 
-span.sel_links {
-	margin-right : 4px;
-	vertical-align  : middle;
-}
-
-/*#feedTree img.feedIcon {
+#feedTree img.feedIcon {
 	position : relative;
 	top : -2px;
-}*/
-
-body#ttrssMain.claro #feedTree.dijitTree .dijitTreeNode .dijitTreeRowSelected {
-	box-shadow : -1px 0px 2px -1px rgba(0,0,0,0.1);
-	border-right-color : white;
 }
 
-body#ttrssMain #feedTree.dijitTree .dijitTreeContainer {
-	max-width : 100%;
-}
-
-body#ttrssMain #feedTree.dijitTree .dijitTreeRow {
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-body#ttrssMain #feedTree.dijitTree .dijitTreeNode .dijitTreeRow {
+body#ttrssMain #feedTree .dijitTreeRow {
 	padding : 2px 0px 2px;
 	height : 22px;
 	border-width : 1px;
 	color : #333;
-}
-
-body#ttrssMain #feedTree.dijitTree img.tinyFeedIcon {
-	position : relative;
-	top : -2px;
 }
 
 ul#filterDlg_Matches li div.dijitCheckBox, ul#filterDlg_Actions li div.dijitCheckBox {
@@ -1117,9 +1060,9 @@ body#ttrssMain #feedTree .counterNode {
 	display : inline-block;
 	font-size : 9px;
 	text-align : center;
-	border : 1px solid rgb(82, 168, 236);
+	border : 1px solid #88b0f0;
 	color : white;
-	background : rgb(82, 168, 236);
+	background : #88b0f0;
 	border-radius : 4px;
 	vertical-align : middle;
 	float : right;
@@ -1131,13 +1074,10 @@ body#ttrssMain #feedTree .counterNode {
 	height : 14px;
 }
 
-body#ttrssMain #feedTree .dijitTreeNode .loadingExpando {
-	left : -3px;
-	height : 22px;
+#feedTree img[src*='indicator_white.gif'] {
 	position : relative;
-	top : -3px;
+	top : -2px;
 }
-
 
 span.highlight {
 	background-color : #ffff00;
@@ -1165,23 +1105,6 @@ body#ttrssMain #feedTree .dijitTreeRow img.dijitTreeExpandoLeaf {
 	position : relative;
 } 
 
-#headlines-frame {
-	-webkit-transform: translateZ(0);
-	-webkit-backface-visibility: hidden;
-}
-
 :focus {
 	outline: none; 
-}
-
-.dijitDropDownButton.attachments .dijitButtonText {
-	font-size : 12px;
-}
-
-.dijitDropDownButton.attachments {
-	display : inline-block;
-}
-
-#editTagsDlg{
-	overflow: visible;
 }

@@ -15,9 +15,9 @@ class Pref_Labels extends Handler_Protected {
 
 		$line = $this->dbh->fetch_assoc($result);
 
-		print_hidden("id", "$label_id");
-		print_hidden("op", "pref-labels");
-		print_hidden("method", "save");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"id\" value=\"$label_id\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-labels\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"save\">";
 
 		print "<div class=\"dlgSec\">".__("Caption")."</div>";
 
@@ -249,6 +249,20 @@ class Pref_Labels extends Handler_Protected {
 	}
 
 	function index() {
+
+		$sort = $this->dbh->escape_string($_REQUEST["sort"]);
+
+		if (!$sort || $sort == "undefined") {
+			$sort = "caption";
+		}
+
+		$label_search = $this->dbh->escape_string($_REQUEST["search"]);
+
+		if (array_key_exists("search", $_REQUEST)) {
+			$_SESSION["prefs_label_search"] = $label_search;
+		} else {
+			$label_search = $_SESSION["prefs_label_search"];
+		}
 
 		print "<div id=\"pref-label-wrap\" dojoType=\"dijit.layout.BorderContainer\" gutters=\"false\">";
 		print "<div id=\"pref-label-header\" dojoType=\"dijit.layout.ContentPane\" region=\"top\">";

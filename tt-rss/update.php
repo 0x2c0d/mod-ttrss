@@ -33,12 +33,7 @@
 			"update-schema",
 			"convert-filters",
 			"force-update",
-			"gen-search-idx",
 			"list-plugins",
-			"debug-feed:",
-			"force-refetch",
-			"force-rehash",
-			"decrypt-feeds",
 			"help");
 
 	foreach (PluginHost::getInstance()->get_commands() as $command => $data) {
@@ -66,7 +61,7 @@
 		<div class="floatingLogo"><img src="images/logo_small.png"></div>
 		<h1><?php echo __("Tiny Tiny RSS data update script.") ?></h1>
 
-		<?php print_error("Please run this script from the command line. Use option \"--help\" to display command help if this error is displayed erroneously."); ?>
+		<?php print_error("Please run this script from the command line. Use option \"-help\" to display command help if this error is displayed erroneously."); ?>
 
 		</body></html>
 	<?php
@@ -85,14 +80,9 @@
 		print "  --log FILE           - log messages to FILE\n";
 		print "  --indexes            - recreate missing schema indexes\n";
 		print "  --update-schema      - update database schema\n";
-		print "  --gen-search-idx     - generate basic PostgreSQL fulltext search index\n";
 		print "  --convert-filters    - convert type1 filters to type2\n";
 		print "  --force-update       - force update of all feeds\n";
 		print "  --list-plugins       - list all available plugins\n";
-		print "  --debug-feed N       - perform debug update of feed N\n";
-		print "  --force-refetch      - debug update: force refetch feed data\n";
-		print "  --force-rehash       - debug update: force rehash articles\n";
-		print "  --decrypt-feeds      - decrypt feed passwords\n";
 		print "  --help               - show this help\n";
 		print "Plugin options:\n";
 
@@ -327,7 +317,7 @@
 			for ($i = $updater->getSchemaVersion() + 1; $i <= SCHEMA_VERSION; $i++) {
 				_debug("performing update up to version $i...");
 
-				$result = $updater->performUpdateTo($i, false);
+				$result = $updater->performUpdateTo($i);
 
 				_debug($result ? "OK!" : "FAILED!");
 
@@ -340,40 +330,9 @@
 
 	}
 
-	if (isset($options["gen-search-idx"])) {
-		echo "Generating search index (stemming set to English)...\n";
-
-		$result = db_query("SELECT COUNT(id) AS count FROM ttrss_entries WHERE tsvector_combined IS NULL");
-		$count = db_fetch_result($result, 0, "count");
-
-		print "Articles to process: $count.\n";
-
-		$limit = 500;
-		$processed = 0;
-
-		while (true) {
-			$result = db_query("SELECT id, title, content FROM ttrss_entries WHERE tsvector_combined IS NULL ORDER BY id LIMIT $limit");
-
-			while ($line = db_fetch_assoc($result)) {
-			   $tsvector_combined = db_escape_string(mb_substr($line['title'] . ' ' . strip_tags(str_replace('<', ' <', $line['content'])),
-					0, 1000000));
-
-				db_query("UPDATE ttrss_entries SET tsvector_combined = to_tsvector('english', '$tsvector_combined') WHERE id = " . $line["id"]);
-			}
-
-			$processed += db_num_rows($result);
-			print "Processed $processed articles...\n";
-
-			if (db_num_rows($result) != $limit) {
-				echo "All done.\n";
-				break;
-			}
-		}
-	}
-
 	if (isset($options["list-plugins"])) {
 		$tmppluginhost = new PluginHost();
-		$tmppluginhost->load_all($tmppluginhost::KIND_ALL, false);
+		$tmppluginhost->load_all($tmppluginhost::KIND_ALL);
 		$enabled = array_map("trim", explode(",", PLUGINS));
 
 		echo "List of all available plugins:\n";
@@ -393,51 +352,8 @@
 
 	}
 
-	if (isset($options["debug-feed"])) {
-		$feed = $options["debug-feed"];
-
-		if (isset($options["force-refetch"])) $_REQUEST["force_refetch"] = true;
-		if (isset($options["force-rehash"])) $_REQUEST["force_rehash"] = true;
-
-		$_REQUEST['xdebug'] = 1;
-
-		update_rss_feed($feed);
-	}
-
-	if (isset($options["decrypt-feeds"])) {
-		$result = db_query("SELECT id, auth_pass FROM ttrss_feeds WHERE auth_pass_encrypted = true");
-
-		if (!function_exists("mcrypt_decrypt")) {
-			_debug("mcrypt functions not available.");
-			return;
-		}
-
-		require_once "crypt.php";
-
-		$total = 0;
-
-		db_query("BEGIN");
-
-		while ($line = db_fetch_assoc($result)) {
-			_debug("processing feed id " . $line["id"]);
-
-			$auth_pass = db_escape_string(decrypt_string($line["auth_pass"]));
-
-			db_query("UPDATE ttrss_feeds SET auth_pass_encrypted = false, auth_pass = '$auth_pass'
-				WHERE id = " . $line["id"]);
-
-			++$total;
-		}
-
-		db_query("COMMIT");
-
-		_debug("$total feeds processed.");
-	}
-
 	PluginHost::getInstance()->run_commands($options);
 
 	if (file_exists(LOCK_DIRECTORY . "/$lock_filename"))
-		if (strtoupper(substr(PHP_OS, 0, 3)) == 'WIN')
-			fclose($lock_handle);
 		unlink(LOCK_DIRECTORY . "/$lock_filename");
 ?>

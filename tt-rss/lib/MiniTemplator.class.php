@@ -160,7 +160,7 @@ var $outputString;                    // string buffer for the generated HTML pa
 * Constructs a MiniTemplator object.
 * @access public
 */
-function __construct() {
+function MiniTemplator() {
    $this->templateValid = false; }
 
 //--- template string handling --------------------------------------------------------------------------------------

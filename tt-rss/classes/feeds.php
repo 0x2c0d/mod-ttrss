@@ -3,9 +3,7 @@ require_once "colors.php";
 
 class Feeds extends Handler_Protected {
 
-    private $params;
-
-    function csrf_ignore($method) {
+	function csrf_ignore($method) {
 		$csrf_ignored = array("index", "feedbrowser", "quickaddfeed", "search");
 
 		return array_search($method, $csrf_ignored) !== false;
@@ -13,7 +11,7 @@ class Feeds extends Handler_Protected {
 
 	private function format_headline_subtoolbar($feed_site_url, $feed_title,
 			$feed_id, $is_cat, $search,
-			$view_mode, $error, $feed_last_updated) {
+			$search_mode, $view_mode, $error, $feed_last_updated) {
 
 		$catchup_sel_link = "catchupSelection()";
 
@@ -34,7 +32,7 @@ class Feeds extends Handler_Protected {
 		if ($is_cat) $cat_q = "&is_cat=$is_cat";
 
 		if ($search) {
-			$search_q = "&q=$search";
+			$search_q = "&q=$search&smode=$search_mode";
 		} else {
 			$search_q = "";
 		}
@@ -86,23 +84,17 @@ class Feeds extends Handler_Protected {
 		$reply .= "<span class=\"main\">";
 		$reply .= "<span id='selected_prompt'></span>";
 
-		/*$reply .= "<span class=\"sel_links\">
+		$reply .= "
 			<a href=\"#\" onclick=\"$sel_all_link\">".__('All')."</a>,
 			<a href=\"#\" onclick=\"$sel_unread_link\">".__('Unread')."</a>,
 			<a href=\"#\" onclick=\"$sel_inv_link\">".__('Invert')."</a>,
 			<a href=\"#\" onclick=\"$sel_none_link\">".__('None')."</a></li>";
 
-		$reply .= "</span> "; */
+		$reply .= " ";
 
 		$reply .= "<select dojoType=\"dijit.form.Select\"
 			onchange=\"headlineActionsChange(this)\">";
-
-		$reply .= "<option value=\"0\" disabled='1'>".__('Select...')."</option>";
-
-		$reply .= "<option value=\"$sel_all_link\">".__('All')."</option>";
-		$reply .= "<option value=\"$sel_unread_link\">".__('Unread')."</option>";
-		$reply .= "<option value=\"$sel_inv_link\">".__('Invert')."</option>";
-		$reply .= "<option value=\"$sel_none_link\">".__('None')."</option>";
+		$reply .= "<option value=\"false\">".__('More...')."</option>";
 
 		$reply .= "<option value=\"0\" disabled=\"1\">".__('Selection toggle:')."</option>";
 
@@ -154,8 +146,10 @@ class Feeds extends Handler_Protected {
 
 	private function format_headlines_list($feed, $method, $view_mode, $limit, $cat_view,
 					$next_unread_feed, $offset, $vgr_last_feed = false,
-					$override_order = false, $include_children = false, $check_first_id = false,
-					$skip_first_id_check = false) {
+					$override_order = false, $include_children = false) {
+
+		if (isset($_REQUEST["DevForceUpdate"]))
+			header("Content-Type: text/plain; charset=utf-8");
 
 		$disable_cache = false;
 
@@ -175,44 +169,22 @@ class Feeds extends Handler_Protected {
 		if ($method == "ForceUpdate" && $feed > 0 && is_numeric($feed)) {
 			// Update the feed if required with some basic flood control
 
-			$any_needs_curl = false;
-
-			if (ini_get("open_basedir")) {
-				$pluginhost = PluginHost::getInstance();
-				foreach ($pluginhost->get_plugins() as $plugin) {
-					$flags = $plugin->flags();
-
-					if (isset($flags["needs_curl"]) && $flags["needs_curl"]) {
-						$any_needs_curl = true;
-						break;
-					}
-				}
-			}
-
-			//if ($_REQUEST["debug"]) print "<!-- any_needs_curl: $any_needs_curl -->";
-
-			if (!$any_needs_curl) {
-
-				$result = $this->dbh->query(
-						"SELECT cache_images," . SUBSTRING_FOR_DATE . "(last_updated,1,19) AS last_updated
-						FROM ttrss_feeds WHERE id = '$feed'");
+			$result = $this->dbh->query(
+				"SELECT cache_images,".SUBSTRING_FOR_DATE."(last_updated,1,19) AS last_updated
+					FROM ttrss_feeds WHERE id = '$feed'");
 
 				if ($this->dbh->num_rows($result) != 0) {
 					$last_updated = strtotime($this->dbh->fetch_result($result, 0, "last_updated"));
 					$cache_images = sql_bool_to_bool($this->dbh->fetch_result($result, 0, "cache_images"));
 
-					if (!$cache_images && time() - $last_updated > 120) {
+					if (!$cache_images && time() - $last_updated > 120 || isset($_REQUEST['DevForceUpdate'])) {
 						include "rssfuncs.php";
 						update_rss_feed($feed, true, true);
 					} else {
 						$this->dbh->query("UPDATE ttrss_feeds SET last_updated = '1970-01-01', last_update_started = '1970-01-01'
-								WHERE id = '$feed'");
+							WHERE id = '$feed'");
 					}
 				}
-			} else {
-				$this->dbh->query("UPDATE ttrss_feeds SET last_updated = '1970-01-01', last_update_started = '1970-01-01'
-								WHERE id = '$feed'");
-			}
 		}
 
 		if ($method_split[0] == "MarkAllReadGR")  {
@@ -231,18 +203,26 @@ class Feeds extends Handler_Protected {
 		}
 
 		@$search = $this->dbh->escape_string($_REQUEST["query"]);
-		@$search_language = $this->dbh->escape_string($_REQUEST["search_language"]); // PGSQL only
 
 		if ($search) {
 			$disable_cache = true;
 		}
 
+		@$search_mode = $this->dbh->escape_string($_REQUEST["search_mode"]);
+
 		if ($_REQUEST["debug"]) $timing_info = print_checkpoint("H0", $timing_info);
 
+//		error_log("format_headlines_list: [" . $feed . "] method [" . $method . "]");
+		if($search_mode == '' && $method != '' ){
+		    $search_mode = $method;
+		}
+//		error_log("search_mode: " . $search_mode);
 
 		if (!$cat_view && is_numeric($feed) && $feed < PLUGIN_FEED_BASE_INDEX && $feed > LABEL_BASE_INDEX) {
 			$handler = PluginHost::getInstance()->get_feed_handler(
 				PluginHost::feed_to_pfeed_id($feed));
+
+		//	function queryFeedHeadlines($feed, $limit, $view_mode, $cat_view, $search, $search_mode, $override_order = false, $offset = 0, $owner_uid = 0, $filter = false, $since_id = 0, $include_children = false, $ignore_vfeed_group = false) {
 
 			if ($handler) {
 				$options = array(
@@ -250,6 +230,7 @@ class Feeds extends Handler_Protected {
 					"view_mode" => $view_mode,
 					"cat_view" => $cat_view,
 					"search" => $search,
+					"search_mode" => $search_mode,
 					"override_order" => $override_order,
 					"offset" => $offset,
 					"owner_uid" => $_SESSION["uid"],
@@ -262,30 +243,9 @@ class Feeds extends Handler_Protected {
 			}
 
 		} else {
-			/*$qfh_ret = queryFeedHeadlines($feed, $limit, $view_mode, $cat_view,
-				$search, false, $override_order, $offset, 0,
-				false, 0, $include_children, $topid);*/
-
-			//function queryFeedHeadlines($feed, $limit,
-			// $view_mode, $cat_view, $search, $search_mode,
-			// $override_order = false, $offset = 0, $owner_uid = 0, $filter = false, $since_id = 0, $include_children = false,
-			// $ignore_vfeed_group = false, $override_strategy = false, $override_vfeed = false, $start_ts = false, $check_top_id = false) {
-
-			$params = array(
-				"feed" => $feed,
-				"limit" => $limit,
-				"view_mode" => $view_mode,
-				"cat_view" => $cat_view,
-				"search" => $search,
-				"search_language" => $search_language,
-				"override_order" => $override_order,
-				"offset" => $offset,
-				"include_children" => $include_children,
-				"check_first_id" => $check_first_id,
-				"skip_first_id_check" => $skip_first_id_check
-			);
-
-			$qfh_ret = queryFeedHeadlines($params);
+			$qfh_ret = queryFeedHeadlines($feed, $limit, $view_mode, $cat_view,
+				$search, $search_mode, $override_order, $offset, 0,
+				false, 0, $include_children);
 		}
 
 		$vfeed_group_enabled = get_pref("VFEED_GROUP_BY_FEED") && $feed != -6;
@@ -299,17 +259,27 @@ class Feeds extends Handler_Protected {
 		$last_updated = strpos($qfh_ret[4], '1970-') === FALSE ?
 			make_local_datetime($qfh_ret[4], false) : __("Never");
 		$highlight_words = $qfh_ret[5];
-		$reply['first_id'] = $qfh_ret[6];
-		$reply['search_query'] = [$search, $search_language];
 
 		$vgroup_last_feed = $vgr_last_feed;
 
 		$reply['toolbar'] = $this->format_headline_subtoolbar($feed_site_url,
 			$feed_title,
-			$feed, $cat_view, $search, $view_mode,
+			$feed, $cat_view, $search, $search_mode, $view_mode,
 			$last_error, $last_updated);
 
-		$headlines_count = is_numeric($result) ? 0 : $this->dbh->num_rows($result);
+		$headlines_count = $this->dbh->num_rows($result);
+
+		/* if (get_pref('COMBINED_DISPLAY_MODE')) {
+			$button_plugins = array();
+			foreach (explode(",", ARTICLE_BUTTON_PLUGINS) as $p) {
+				$pclass = "button_" . trim($p);
+
+				if (class_exists($pclass)) {
+					$plugin = new $pclass();
+					array_push($button_plugins, $plugin);
+				}
+			}
+		} */
 
 		if ($offset == 0) {
 			foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_HEADLINES_BEFORE) as $p) {
@@ -317,9 +287,7 @@ class Feeds extends Handler_Protected {
 			}
 		}
 
-		$reply['content'] = '';
-
-		if ($headlines_count > 0) {
+		if ($this->dbh->num_rows($result) > 0) {
 
 			$lnum = $offset;
 
@@ -331,7 +299,6 @@ class Feeds extends Handler_Protected {
 			$expand_cdm = get_pref('CDM_EXPANDED');
 
 			while ($line = $this->dbh->fetch_assoc($result)) {
-
 				$line["content_preview"] =  "&mdash; " . truncate_string(strip_tags($line["content"]), 250);
 
 				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
@@ -399,7 +366,7 @@ class Feeds extends Handler_Protected {
 						alt=\"Publish article\" onclick='togglePub($id)'>";
 				}
 
-#				$content_link = "<a target=\"_blank\" rel=\"noopener noreferrer\" href=\"".$line["link"]."\">" .
+#				$content_link = "<a target=\"_blank\" href=\"".$line["link"]."\">" .
 #					$line["title"] . "</a>";
 
 #				$content_link = "<a
@@ -410,7 +377,7 @@ class Feeds extends Handler_Protected {
 #				$content_link = "<a href=\"javascript:viewContentUrl('".$line["link"]."');\">" .
 #					$line["title"] . "</a>";
 
-				$updated_fmt = make_local_datetime($line["updated"], false, false, false, true);
+				$updated_fmt = make_local_datetime($line["updated"], false);
 				$date_entered_fmt = T_sprintf("Imported at %s",
 					make_local_datetime($line["date_entered"], false));
 
@@ -472,12 +439,10 @@ class Feeds extends Handler_Protected {
 
 							$vf_catchup_link = "<a class='catchup' onclick='catchupFeedInGroup($feed_id);' href='#'>".__('mark feed as read')."</a>";
 
-							$reply['content'] .= "<div data-feed-id='$feed_id' id='FTITLE-$feed_id' class='cdmFeedTitle'>".
+							$reply['content'] .= "<div id='FTITLE-$feed_id' class='cdmFeedTitle'>".
 								"<div style='float : right'>$feed_icon_img</div>".
-								"<a class='title' href=\"#\" onclick=\"viewfeed({feed:$feed_id})\">".
-								$line["feed_title"]."</a>
+								"<a class='title' href=\"#\" onclick=\"viewfeed($feed_id)\">".								$line["feed_title"]."</a>
 								$vf_catchup_link</div>";
-
 
 						}
 					}
@@ -485,7 +450,7 @@ class Feeds extends Handler_Protected {
 					$mouseover_attrs = "onmouseover='postMouseIn(event, $id)'
 						onmouseout='postMouseOut($id)'";
 
-					$reply['content'] .= "<div class='hl hlMenuAttach $class' data-orig-feed-id='$feed_id' data-article-id='$id' id='RROW-$id' $mouseover_attrs>";
+					$reply['content'] .= "<div class='hl $class' orig-feed-id='$feed_id' id='RROW-$id' $mouseover_attrs>";
 
 					$reply['content'] .= "<div class='hlLeft'>";
 
@@ -519,7 +484,7 @@ class Feeds extends Handler_Protected {
 						if (@$line["feed_title"]) {
 							$rgba = @$rgba_cache[$feed_id];
 
-							$reply['content'] .= "<span class=\"hlFeed\"><a style=\"background : rgba($rgba, 0.3)\" href=\"#\" onclick=\"viewfeed({feed:$feed_id})\">".
+							$reply['content'] .= "<span class=\"hlFeed\"><a style=\"background : rgba($rgba, 0.3)\" href=\"#\" onclick=\"viewfeed($feed_id)\">".
 								truncate_string($line["feed_title"],30)."</a></span>";
 						}
 					}
@@ -536,7 +501,7 @@ class Feeds extends Handler_Protected {
 
 					if ($line["feed_title"] && !$vfeed_group_enabled) {
 
-						$reply['content'] .= "<span onclick=\"viewfeed({feed:$feed_id})\"
+						$reply['content'] .= "<span onclick=\"viewfeed($feed_id)\"
 							style=\"cursor : pointer\"
 							title=\"".htmlspecialchars($line['feed_title'])."\">
 							$feed_icon_img</span>";
@@ -577,11 +542,10 @@ class Feeds extends Handler_Protected {
 								//$feed_icon_img = "<img class=\"tinyFeedIcon\" src=\"images/blank_icon.gif\" alt=\"\">";
 							}
 
-							$reply['content'] .= "<div data-feed-id='$feed_id' id='FTITLE-$feed_id' class='cdmFeedTitle'>".
+							$reply['content'] .= "<div id='FTITLE-$feed_id' class='cdmFeedTitle'>".
 								"<div style=\"float : right\">$feed_icon_img</div>".
-								"<a href=\"#\" class='title' onclick=\"viewfeed({feed:$feed_id})\">".
+								"<a href=\"#\" class='title' onclick=\"viewfeed($feed_id)\">".
 								$line["feed_title"]."</a> $vf_catchup_link</div>";
-
 						}
 					}
 
@@ -591,7 +555,7 @@ class Feeds extends Handler_Protected {
 					$expanded_class = $expand_cdm ? "expanded" : "expandable";
 
 					$reply['content'] .= "<div class=\"cdm $hlc_suffix $expanded_class $class\"
-						id=\"RROW-$id\" data-article-id='$id' data-orig-feed-id='$feed_id' $mouseover_attrs>";
+						id=\"RROW-$id\" orig-feed-id='$feed_id' $mouseover_attrs>";
 
 					$reply['content'] .= "<div class=\"cdmHeader\">";
 					$reply['content'] .= "<div style=\"vertical-align : middle\">";
@@ -612,14 +576,11 @@ class Feeds extends Handler_Protected {
 						}
 					}
 
-					// data-article-id included for context menu
 					$reply['content'] .= "<span id=\"RTITLE-$id\"
 						onclick=\"return cdmClicked(event, $id);\"
-						data-article-id=\"$id\"
-						class=\"titleWrap hlMenuAttach $hlc_suffix\">						
+						class=\"titleWrap $hlc_suffix\">
 						<a class=\"title $hlc_suffix\"
-						title=\"".htmlspecialchars($line["title"])."\"
-						target=\"_blank\" rel=\"noopener noreferrer\" href=\"".
+						target=\"_blank\" href=\"".
 						htmlspecialchars($line["link"])."\">".
 						$line["title"] .
 						"</a> <span class=\"author\">$entry_author</span>";
@@ -645,7 +606,7 @@ class Feeds extends Handler_Protected {
 
 							$reply['content'] .= "<div class=\"hlFeed\">
 								<a href=\"#\" style=\"background-color: rgba($rgba,0.3)\"
-								onclick=\"viewfeed({feed:$feed_id})\">".
+								onclick=\"viewfeed($feed_id)\">".
 								truncate_string($line["feed_title"],30)."</a>
 							</div>";
 						}
@@ -660,14 +621,14 @@ class Feeds extends Handler_Protected {
 					if (!get_pref("VFEED_GROUP_BY_FEED") && $line["feed_title"]) {
 						$reply['content'] .= "<span style=\"cursor : pointer\"
 							title=\"".htmlspecialchars($line["feed_title"])."\"
-							onclick=\"viewfeed({feed:$feed_id})\">$feed_icon_img</span>";
+							onclick=\"viewfeed($feed_id)\">$feed_icon_img</span>";
 					}
 					$reply['content'] .= "</div>";
 
 					$reply['content'] .= "</div>";
 
 					$reply['content'] .= "<div class=\"cdmContent\" $content_hidden
-						onclick=\"return cdmClicked(event, $id, true);\"
+						onclick=\"return cdmClicked(event, $id);\"
 						id=\"CICD-$id\">";
 
 					$reply['content'] .= "<div id=\"POSTNOTE-$id\">";
@@ -683,7 +644,7 @@ class Feeds extends Handler_Protected {
 			if ($line["orig_feed_id"]) {
 
 				$tmp_result = $this->dbh->query("SELECT * FROM ttrss_archived_feeds
-					WHERE id = ".$line["orig_feed_id"] . " AND owner_uid = " . $_SESSION["uid"]);
+					WHERE id = ".$line["orig_feed_id"]);
 
 						if ($this->dbh->num_rows($tmp_result) != 0) {
 
@@ -694,13 +655,13 @@ class Feeds extends Handler_Protected {
 
 							$tmp_line = $this->dbh->fetch_assoc($tmp_result);
 
-							$reply['content'] .= "<a target='_blank' rel='noopener noreferrer'
+							$reply['content'] .= "<a target='_blank'
 								href=' " . htmlspecialchars($tmp_line['site_url']) . "'>" .
 								$tmp_line['title'] . "</a>";
 
 							$reply['content'] .= "&nbsp;";
 
-							$reply['content'] .= "<a target='_blank' rel='noopener noreferrer' href='" . htmlspecialchars($tmp_line['feed_url']) . "'>";
+							$reply['content'] .= "<a target='_blank' href='" . htmlspecialchars($tmp_line['feed_url']) . "'>";
 							$reply['content'] .= "<img title='".__('Feed URL')."'class='tinyFeedIcon' src='images/pub_unset.png'></a>";
 
 							$reply['content'] .= "</div>";
@@ -709,22 +670,24 @@ class Feeds extends Handler_Protected {
 
 					$reply['content'] .= "<span id=\"CWRAP-$id\">";
 
-					$reply['content'] .= "<span id=\"CENCW-$id\" class=\"cencw\" style=\"display : none\">";
-					$reply['content'] .= htmlspecialchars($line["content"]);
-					$reply['content'] .= "</span>";
+//					if (!$expand_cdm) {
+						$reply['content'] .= "<span id=\"CENCW-$id\" style=\"display : none\">";
+						$reply['content'] .= htmlspecialchars($line["content"]);
+						$reply['content'] .= "</span.";
+
+//					} else {
+//						$reply['content'] .= $line["content"];
+//					}
 
 					$reply['content'] .= "</span>";
-
-					$reply['content'] .= "</div>";
-
-					$reply['content'] .= "<div class=\"cdmIntermediate\">";
 
 					$always_display_enclosures = sql_bool_to_bool($line["always_display_enclosures"]);
+
 					$reply['content'] .= format_article_enclosures($id, $always_display_enclosures, $line["content"], sql_bool_to_bool($line["hide_images"]));
 
 					$reply['content'] .= "</div>";
 
-					$reply['content'] .= "<div class=\"cdmFooter\" onclick=\"cdmFooterClick(event)\">";
+					$reply['content'] .= "<div class=\"cdmFooter\">";
 
 					foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_ARTICLE_LEFT_BUTTON) as $p) {
 						$reply['content'] .= $p->hook_article_left_button($line);
@@ -732,14 +695,12 @@ class Feeds extends Handler_Protected {
 
 					$tags_str = format_tags_string($tags, $id);
 
-					$reply['content'] .= "<span class='left'>";
-
 					$reply['content'] .= "<img src='images/tag.png' alt='Tags' title='Tags'>
 						<span id=\"ATSTR-$id\">$tags_str</span>
 						<a title=\"".__('Edit tags for this article')."\"
 						href=\"#\" onclick=\"editArticleTags($id)\">(+)</a>";
 
-					$num_comments = (int) $line["num_comments"];
+					$num_comments = $line["num_comments"];
 					$entry_comments = "";
 
 					if ($num_comments > 0) {
@@ -749,19 +710,18 @@ class Feeds extends Handler_Protected {
 							$comments_url = htmlspecialchars($line["link"]);
 						}
 						$entry_comments = "<a class=\"postComments\"
-							target='_blank' rel='noopener noreferrer' href=\"$comments_url\">$num_comments ".
+							target='_blank' href=\"$comments_url\">$num_comments ".
 							_ngettext("comment", "comments", $num_comments)."</a>";
 
 					} else {
 						if ($line["comments"] && $line["link"] != $line["comments"]) {
-							$entry_comments = "<a class=\"postComments\" target='_blank' rel='noopener noreferrer' href=\"".htmlspecialchars($line["comments"])."\">".__("comments")."</a>";
+							$entry_comments = "<a class=\"postComments\" target='_blank' href=\"".htmlspecialchars($line["comments"])."\">".__("comments")."</a>";
 						}
 					}
 
 					if ($entry_comments) $reply['content'] .= "&nbsp;($entry_comments)";
 
-					$reply['content'] .= "</span>";
-					$reply['content'] .= "<div>";
+					$reply['content'] .= "<div style=\"float : right\">";
 
 //					$reply['content'] .= "$marked_pic";
 //					$reply['content'] .= "$published_pic";
@@ -784,7 +744,7 @@ class Feeds extends Handler_Protected {
 
 			if ($_REQUEST["debug"]) $timing_info = print_checkpoint("PE", $timing_info);
 
-		} else if (!is_numeric($result)) {
+		} else {
 			$message = "";
 
 			switch ($view_mode) {
@@ -806,7 +766,7 @@ class Feeds extends Handler_Protected {
 			}
 
 			if (!$offset && $message) {
-				$reply['content'] = "<div class='whiteBox'>$message";
+				$reply['content'] .= "<div class='whiteBox'>$message";
 
 				$reply['content'] .= "<p><span class=\"insensitive\">";
 
@@ -829,10 +789,7 @@ class Feeds extends Handler_Protected {
 						__('Some feeds have update errors (click for details)')."</a>";
 				}
 				$reply['content'] .= "</span></p></div>";
-
 			}
-		} else if (is_numeric($result) && $result == -1) {
-			$reply['first_id_changed'] = true;
 		}
 
 		if ($_REQUEST["debug"]) $timing_info = print_checkpoint("H2", $timing_info);
@@ -863,7 +820,6 @@ class Feeds extends Handler_Protected {
 		@$offset = $this->dbh->escape_string($_REQUEST["skip"]);
 		@$vgroup_last_feed = $this->dbh->escape_string($_REQUEST["vgrlf"]);
 		$order_by = $this->dbh->escape_string($_REQUEST["order_by"]);
-		$check_first_id = $this->dbh->escape_string($_REQUEST["fid"]);
 
 		if (is_numeric($feed)) $feed = (int) $feed;
 
@@ -918,8 +874,14 @@ class Feeds extends Handler_Protected {
 
 		$reply['headlines'] = array();
 
+		if (!$next_unread_feed)
+			$reply['headlines']['id'] = $feed;
+		else
+			$reply['headlines']['id'] = $next_unread_feed;
+
+		$reply['headlines']['is_cat'] = (bool) $cat_view;
+
 		$override_order = false;
-		$skip_first_id_check = false;
 
 		switch ($order_by) {
 		case "title":
@@ -927,7 +889,6 @@ class Feeds extends Handler_Protected {
 			break;
 		case "date_reverse":
 			$override_order = "score DESC, date_entered, updated";
-			$skip_first_id_check = true;
 			break;
 		case "feed_dates":
 			$override_order = "updated DESC";
@@ -938,7 +899,7 @@ class Feeds extends Handler_Protected {
 
 		$ret = $this->format_headlines_list($feed, $method,
 			$view_mode, $limit, $cat_view, $next_unread_feed, $offset,
-			$vgroup_last_feed, $override_order, true, $check_first_id, $skip_first_id_check);
+			$vgroup_last_feed, $override_order, true);
 
 		//$topmost_article_ids = $ret[0];
 		$headlines_count = $ret[1];
@@ -946,17 +907,8 @@ class Feeds extends Handler_Protected {
 		$disable_cache = $ret[3];
 		$vgroup_last_feed = $ret[4];
 
-		//$reply['headlines']['content'] =& $ret[5]['content'];
-		//$reply['headlines']['toolbar'] =& $ret[5]['toolbar'];
-
-		$reply['headlines'] = $ret[5];
-
-		if (!$next_unread_feed)
-			$reply['headlines']['id'] = $feed;
-		else
-			$reply['headlines']['id'] = $next_unread_feed;
-
-		$reply['headlines']['is_cat'] = (bool) $cat_view;
+		$reply['headlines']['content'] =& $ret[5]['content'];
+		$reply['headlines']['toolbar'] =& $ret[5]['toolbar'];
 
 		if ($_REQUEST["debug"]) $timing_info = print_checkpoint("05", $timing_info);
 
@@ -979,7 +931,6 @@ class Feeds extends Handler_Protected {
 		$reply['headlines']['is_cat'] = false;
 
 		$reply['headlines']['toolbar'] = '';
-
 		$reply['headlines']['content'] = "<div class='whiteBox'>".__('No feed selected.');
 
 		$reply['headlines']['content'] .= "<p><span class=\"insensitive\">";
@@ -1015,7 +966,7 @@ class Feeds extends Handler_Protected {
 	private function generate_error_feed($error) {
 		$reply = array();
 
-		$reply['headlines']['id'] = -7;
+		$reply['headlines']['id'] = -6;
 		$reply['headlines']['is_cat'] = false;
 
 		$reply['headlines']['toolbar'] = '';
@@ -1030,10 +981,8 @@ class Feeds extends Handler_Protected {
 	}
 
 	function quickAddFeed() {
-		print_hidden("op", "rpc");
-		print_hidden("method", "addfeed");
-
-		print "<div id='fadd_error_message' style='display : none' class='alert alert-danger'></div>";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"rpc\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"addfeed\">";
 
 		print "<div id='fadd_multiple_notify' style='display : none'>";
 		print_notice("Provided URL is a HTML page referencing multiple feeds, please select required feed from the dropdown menu below.");
@@ -1078,12 +1027,10 @@ class Feeds extends Handler_Protected {
 
 				" <input dojoType=\"dijit.form.TextBox\" name='login'\"
 					placeHolder=\"".__("Login")."\"
-					autocomplete=\"new-password\"
 					style=\"width : 10em;\"> ".
 				" <input
 					placeHolder=\"".__("Password")."\"
 					dojoType=\"dijit.form.TextBox\" type='password'
-					autocomplete=\"new-password\"
 					style=\"width : 10em;\" name='pass'\">
 			</div></div>";
 
@@ -1114,8 +1061,8 @@ class Feeds extends Handler_Protected {
 
 		$browser_search = $this->dbh->escape_string($_REQUEST["search"]);
 
-		print_hidden("op", "rpc");
-		print_hidden("method", "updateFeedBrowser");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"rpc\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"updateFeedBrowser\">";
 
 		print "<div dojoType=\"dijit.Toolbar\">
 			<div style='float : right'>
@@ -1171,13 +1118,36 @@ class Feeds extends Handler_Protected {
 			style=\"font-size : 16px; width : 20em;\"
 			required=\"1\" name=\"query\" type=\"search\" value=''>";
 
-		print "<hr/><span style='float : right'>".T_sprintf('in %s', getFeedTitle($active_feed_id, $is_cat))."</span>";
+		print "<hr/>".__('Limit search to:')." ";
 
-		if (DB_TYPE == "pgsql") {
-			print "<hr/>";
-			print_select("search_language", "", Pref_Feeds::$feed_languages,
-				"dojoType='dijit.form.Select' title=\"".__('Used for word stemming')."\"");
+		print "<select name=\"search_mode\" dojoType=\"dijit.form.Select\">
+			<option value=\"all_feeds\">".__('All feeds')."</option>";
+
+		$feed_title = getFeedTitle($active_feed_id);
+
+		if (!$is_cat) {
+			$feed_cat_title = getFeedCatTitle($active_feed_id);
+		} else {
+			$feed_cat_title = getCategoryTitle($active_feed_id);
 		}
+
+		if ($active_feed_id && !$is_cat) {
+			print "<option selected=\"1\" value=\"this_feed\">$feed_title</option>";
+		} else {
+			print "<option disabled=\"1\" value=\"false\">".__('This feed')."</option>";
+		}
+
+		if ($is_cat) {
+		  	$cat_preselected = "selected=\"1\"";
+		}
+
+		if (get_pref('ENABLE_FEED_CATS') && ($active_feed_id > 0 || $is_cat)) {
+			print "<option $cat_preselected value=\"this_cat\">$feed_cat_title</option>";
+		} else {
+			//print "<option disabled>".__('This category')."</option>";
+		}
+
+		print "</select>";
 
 		print "</div>";
 
@@ -1194,52 +1164,6 @@ class Feeds extends Handler_Protected {
 		</div>";
 	}
 
-	function update_debugger() {
-		header("Content-type: text/html");
 
-		$feed_id = (int)$_REQUEST["feed_id"];
-		@$do_update = $_REQUEST["action"] == "do_update";
-		$csrf_token = $_REQUEST["csrf_token"];
-
-		$refetch_checked = isset($_REQUEST["force_refetch"]) ? "checked" : "";
-		$rehash_checked = isset($_REQUEST["force_rehash"]) ? "checked" : "";
-
-		?>
-		<html>
-		<head>
-			<link rel="stylesheet" type="text/css" href="css/utility.css">
-			<title>Feed Debugger</title>
-		</head>
-		<body class="small_margins">
-		<h1>Feed Debugger: <?php echo "$feed_id: " . getFeedTitle($feed_id) ?></h1>
-		<form method="GET" action="">
-			<input type="hidden" name="op" value="feeds">
-			<input type="hidden" name="method" value="update_debugger">
-			<input type="hidden" name="xdebug" value="1">
-			<input type="hidden" name="csrf_token" value="<?php echo $csrf_token ?>">
-			<input type="hidden" name="action" value="do_update">
-			<input type="hidden" name="feed_id" value="<?php echo $feed_id ?>">
-			<input type="checkbox" name="force_refetch" value="1" <?php echo $refetch_checked ?>> Force refetch<br/>
-			<input type="checkbox" name="force_rehash" value="1" <?php echo $rehash_checked ?>> Force rehash<br/>
-
-			<p/><button type="submit">Continue</button>
-		</form>
-
-		<hr>
-
-		<pre><?php
-
-		if ($do_update) {
-			include "rssfuncs.php";
-			update_rss_feed($feed_id, true, true);
-		}
-
-		?></pre>
-
-		</body>
-		</html>
-		<?php
-
-	}
 }
 ?>

@@ -1,26 +1,14 @@
 <?php
-class Cache_Starred_Images extends Plugin implements IHandler {
+class Cache_Starred_Images extends Plugin {
 
 	private $host;
 	private $cache_dir;
 
 	function about() {
 		return array(1.0,
-			"Automatically cache Starred articles' images and HTML5 video files",
+			"Automatically cache images in Starred articles",
 			"fox",
 			true);
-	}
-
-	function csrf_ignore($method) {
-		return false;
-	}
-
-	function before($method) {
-		return true;
-	}
-
-	function after() {
-		return true;
 	}
 
 	function init($host) {
@@ -41,8 +29,6 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 				$host->add_hook($host::HOOK_UPDATE_TASK, $this);
 				$host->add_hook($host::HOOK_HOUSE_KEEPING, $this);
 				$host->add_hook($host::HOOK_SANITIZE, $this);
-				$host->add_handler("public", "cache_starred_images_getimage", $this);
-
 			} else {
 				user_error("Starred cache directory is not writable.", E_USER_WARNING);
 			}
@@ -52,19 +38,16 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 		}
 	}
 
-	function cache_starred_images_getimage() {
+	function image() {
 		ob_end_clean();
 
 		$hash = basename($_REQUEST["hash"]);
 
 		if ($hash) {
 
-			$filename = $this->cache_dir . "/" . basename($hash);
-			$is_video = strpos($filename, ".mp4") !== FALSE;
+			$filename = $this->cache_dir . "/" . $hash . '.png';
 
 			if (file_exists($filename)) {
-				header("Content-Disposition: attachment; filename=\"$hash\"");
-
 				/* See if we can use X-Sendfile */
 				$xsendfile = false;
 				if (function_exists('apache_get_modules') &&
@@ -76,7 +59,7 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 					header("Content-type: application/octet-stream");
 					header('Content-Disposition: attachment; filename="' . basename($filename) . '"');
 				} else {
-					header("Content-type: " . ($is_video ? "video/mp4" : "image/png"));
+					header("Content-type: image/png");
 					$stamp = gmdate("D, d M Y H:i:s", filemtime($filename)). " GMT";
 					header("Last-Modified: $stamp", true);
 					readfile($filename);
@@ -89,7 +72,7 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 	}
 
 	function hook_house_keeping() {
-		$files = glob($this->cache_dir . "/*.{png,mp4}", GLOB_BRACE);
+		$files = glob($this->cache_dir . "/*.png");
 
 		$last_article_id = 0;
 		$article_exists = 1;
@@ -116,19 +99,18 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 		$xpath = new DOMXpath($doc);
 
 		if ($article_id) {
-			$entries = $xpath->query('(//img[@src])|(//video/source[@src])');
+			$entries = $xpath->query('(//img[@src])');
 
 			foreach ($entries as $entry) {
 				if ($entry->hasAttribute('src')) {
 					$src = rewrite_relative_url($site_url, $entry->getAttribute('src'));
 
-					$extension = $entry->tagName == 'source' ? '.mp4' : '.png';
-					$local_filename = $this->cache_dir . $article_id . "-" . sha1($src) . $extension;
+					$local_filename = $this->cache_dir . $article_id . "-" . sha1($src) . ".png";
 
 					if (file_exists($local_filename)) {
 						$entry->setAttribute("src", get_self_url_prefix() .
-							"/public.php?op=cache_starred_images_getimage&method=image&hash=" .
-							$article_id . "-" . sha1($src) . $extension);
+							"/backend.php?op=pluginhandler&plugin=cache_starred_images&method=image&hash=" .
+							$article_id . "-" . sha1($src));
 					}
 
 				}
@@ -144,10 +126,11 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 				(ttrss_user_entries.feed_id = ttrss_feeds.id)
 			WHERE ref_id = ttrss_entries.id AND
 				marked = true AND
-				(UPPER(content) LIKE '%<IMG%' OR UPPER(content) LIKE '%<VIDEO%') AND
+				UPPER(content) LIKE '%<IMG%' AND
 				site_url != '' AND
 				plugin_data NOT LIKE '%starred_cache_images%'
 			ORDER BY ".sql_random_function()." LIMIT 100");
+
 
 		while ($line = db_fetch_assoc($result)) {
 			if ($line["site_url"]) {
@@ -173,21 +156,17 @@ class Cache_Starred_Images extends Plugin implements IHandler {
 		$doc->loadHTML($charset_hack . $content);
 		$xpath = new DOMXPath($doc);
 
-		$entries = $xpath->query('(//img[@src])|(//video/source[@src])');
+		$entries = $xpath->query('(//img[@src])');
 
 		$success = false;
 		$has_images = false;
 
 		foreach ($entries as $entry) {
-
-			if ($entry->hasAttribute('src') && strpos($entry->getAttribute('src'), "data:") !== 0) {
-
+			if ($entry->hasAttribute('src')) {
 				$has_images = true;
 				$src = rewrite_relative_url($site_url, $entry->getAttribute('src'));
 
-				$extension = $entry->tagName == 'source' ? '.mp4' : '.png';
-
-				$local_filename = $this->cache_dir . $article_id . "-" . sha1($src) . $extension;
+				$local_filename = $this->cache_dir . $article_id . "-" . sha1($src) . ".png";
 
 				//_debug("cache_images: downloading: $src to $local_filename");
 

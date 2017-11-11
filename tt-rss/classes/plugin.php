@@ -15,17 +15,6 @@ class Plugin {
 		return array(1.0, "plugin", "No description", "No author", false);
 	}
 
-	function flags() {
-		/* associative array, possible keys:
-			needs_curl = boolean
-		*/
-		return array();
-	}
-
-	function is_public_method($method) {
-		return false;
-	}
-
 	function get_js() {
 		return "";
 	}

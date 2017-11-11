@@ -41,12 +41,12 @@ class Article extends Handler_Protected {
 		} else if ($mode == "zoom") {
 			array_push($articles, format_article($id, true, true));
 		} else if ($mode == "raw") {
-			if (isset($_REQUEST['html'])) {
+			if ($_REQUEST['html']) {
 				header("Content-Type: text/html");
 				print '<link rel="stylesheet" type="text/css" href="css/tt-rss.css"/>';
 			}
 
-			$article = format_article($id, false, isset($_REQUEST["zoom"]));
+			$article = format_article($id, false);
 			print $article['content'];
 			return;
 		}
@@ -88,25 +88,6 @@ class Article extends Handler_Protected {
 			$owner_uid) {
 
 		$guid = 'SHA1:' . sha1("ttshared:" . $url . $owner_uid); // include owner_uid to prevent global GUID clash
-
-		if (!$content) {
-			$pluginhost = new PluginHost();
-			$pluginhost->load_all(PluginHost::KIND_ALL, $owner_uid);
-			$pluginhost->load_data();
-
-			$af_readability = $pluginhost->get_plugin("Af_Readability");
-
-			if ($af_readability) {
-				$enable_share_anything = $pluginhost->get($af_readability, "enable_share_anything");
-
-				if ($enable_share_anything) {
-					$extracted_content = $af_readability->extract_content($url);
-
-					if ($extracted_content) $content = db_escape_string($extracted_content);
-				}
-			}
-		}
-
 		$content_hash = sha1($content);
 
 		if ($labels_str != "") {
@@ -202,14 +183,14 @@ class Article extends Handler_Protected {
 
 		$tags_str = join(", ", $tags);
 
-		print_hidden("id", "$param");
-		print_hidden("op", "article");
-		print_hidden("method", "setArticleTags");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"id\" value=\"$param\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"article\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"setArticleTags\">";
 
 		print "<table width='100%'><tr><td>";
 
 		print "<textarea dojoType=\"dijit.form.SimpleTextarea\" rows='4'
-			style='height : 100px; font-size : 12px; width : 98%' id=\"tags_str\"
+			style='font-size : 12px; width : 100%' id=\"tags_str\"
 			name='tags_str'>$tags_str</textarea>
 		<div class=\"autocomplete\" id=\"tags_choices\"
 				style=\"display:none\"></div>";
@@ -234,18 +215,6 @@ class Article extends Handler_Protected {
 			score = '$score' WHERE ref_id IN ($ids) AND owner_uid = " . $_SESSION["uid"]);
 
 		print json_encode(array("id" => $ids,
-			"score" => (int)$score,
-			"score_pic" => get_score_pic($score)));
-	}
-
-	function getScore() {
-		$id = $this->dbh->escape_string($_REQUEST['id']);
-
-		$result = $this->dbh->query("SELECT score FROM ttrss_user_entries WHERE ref_id = $id AND owner_uid = " . $_SESSION["uid"]);
-		$score = $this->dbh->fetch_result($result, 0, "score");
-
-		print json_encode(array("id" => $id,
-			"score" => (int)$score,
 			"score_pic" => get_score_pic($score)));
 	}
 

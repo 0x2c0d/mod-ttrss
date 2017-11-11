@@ -2,7 +2,7 @@
 
 class API extends Handler {
 
-	const API_LEVEL  = 14;
+	const API_LEVEL  = 11;
 
 	const STATUS_OK  = 0;
 	const STATUS_ERR = 1;
@@ -184,8 +184,6 @@ class API extends Handler {
 		$feed_id = $this->dbh->escape_string($_REQUEST["feed_id"]);
 		if ($feed_id != "") {
 
-			if (is_numeric($feed_id)) $feed_id = (int) $feed_id;
-
 			$limit = (int)$this->dbh->escape_string($_REQUEST["limit"]);
 
 			if (!$limit || $limit >= 200) $limit = 200;
@@ -205,12 +203,8 @@ class API extends Handler {
 			$force_update = sql_bool_to_bool($_REQUEST["force_update"]);
 			$has_sandbox = sql_bool_to_bool($_REQUEST["has_sandbox"]);
 			$excerpt_length = (int)$this->dbh->escape_string($_REQUEST["excerpt_length"]);
-			$check_first_id = (int)$this->dbh->escape_string($_REQUEST["check_first_id"]);
-			$include_header = sql_bool_to_bool($_REQUEST["include_header"]);
 
 			$_SESSION['hasSandbox'] = $has_sandbox;
-
-			$skip_first_id_check = false;
 
 			$override_order = false;
 			switch ($_REQUEST["order_by"]) {
@@ -219,7 +213,6 @@ class API extends Handler {
 					break;
 				case "date_reverse":
 					$override_order = "score DESC, date_entered, updated";
-					$skip_first_id_check = true;
 					break;
 				case "feed_dates":
 					$override_order = "updated DESC";
@@ -229,17 +222,14 @@ class API extends Handler {
 			/* do not rely on params below */
 
 			$search = $this->dbh->escape_string($_REQUEST["search"]);
+			$search_mode = $this->dbh->escape_string($_REQUEST["search_mode"]);
 
-			list($headlines, $headlines_header) = $this->api_get_headlines($feed_id, $limit, $offset,
+			$headlines = $this->api_get_headlines($feed_id, $limit, $offset,
 				$filter, $is_cat, $show_excerpt, $show_content, $view_mode, $override_order,
-				$include_attachments, $since_id, $search,
-				$include_nested, $sanitize_content, $force_update, $excerpt_length, $check_first_id, $skip_first_id_check);
+				$include_attachments, $since_id, $search, $search_mode,
+				$include_nested, $sanitize_content, $force_update, $excerpt_length);
 
-			if ($include_header) {
-				$this->wrap(self::STATUS_OK, array($headlines_header, $headlines));
-			} else {
-				$this->wrap(self::STATUS_OK, $headlines);
-			}
+			$this->wrap(self::STATUS_OK, $headlines);
 		} else {
 			$this->wrap(self::STATUS_ERR, array("error" => 'INCORRECT_USAGE'));
 		}
@@ -308,7 +298,7 @@ class API extends Handler {
 						"/public.php?op=rss&id=-2&key=" .
 						get_feed_access_key(-2, false);
 
-					$p = new pubsubhubbub\publisher\Publisher(PUBSUBHUBBUB_HUB);
+					$p = new Publisher(PUBSUBHUBBUB_HUB);
 					$pubsub_result = $p->publish_update($rss_link);
 				}
 			}
@@ -325,17 +315,13 @@ class API extends Handler {
 	function getArticle() {
 
 		$article_id = join(",", array_filter(explode(",", $this->dbh->escape_string($_REQUEST["article_id"])), is_numeric));
-		$sanitize_content = !isset($_REQUEST["sanitize"]) ||
-			sql_bool_to_bool($_REQUEST["sanitize"]);
 
 		if ($article_id) {
 
-			$query = "SELECT id,guid,title,link,content,feed_id,comments,int_id,
+			$query = "SELECT id,title,link,content,feed_id,comments,int_id,
 				marked,unread,published,score,note,lang,
 				".SUBSTRING_FOR_DATE."(updated,1,16) as updated,
-				author,(SELECT title FROM ttrss_feeds WHERE id = feed_id) AS feed_title,
-				(SELECT site_url FROM ttrss_feeds WHERE id = feed_id) AS site_url,
-				(SELECT hide_images FROM ttrss_feeds WHERE id = feed_id) AS hide_images
+				author,(SELECT title FROM ttrss_feeds WHERE id = feed_id) AS feed_title
 				FROM ttrss_entries,ttrss_user_entries
 				WHERE	id IN ($article_id) AND ref_id = id AND owner_uid = " .
 					$_SESSION["uid"] ;
@@ -352,7 +338,6 @@ class API extends Handler {
 
 					$article = array(
 						"id" => $line["id"],
-						"guid" => $line["guid"],
 						"title" => $line["title"],
 						"link" => $line["link"],
 						"labels" => get_article_labels($line['id']),
@@ -362,6 +347,7 @@ class API extends Handler {
 						"comments" => $line["comments"],
 						"author" => $line["author"],
 						"updated" => (int) strtotime($line["updated"]),
+						"content" => $line["content"],
 						"feed_id" => $line["feed_id"],
 						"attachments" => $attachments,
 						"score" => (int)$line["score"],
@@ -369,15 +355,6 @@ class API extends Handler {
 						"note" => $line["note"],
 						"lang" => $line["lang"]
 					);
-
-					if ($sanitize_content) {
-						$article["content"] = sanitize(
-							$line["content"],
-							sql_bool_to_bool($line['hide_images']),
-							false, $line["site_url"], false, $line["id"]);
-					} else {
-						$article["content"] = $line["content"];
-					}
 
 					foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_RENDER_ARTICLE_API) as $p) {
 						$article = $p->hook_render_article_api(array("article" => $article));
@@ -417,9 +394,7 @@ class API extends Handler {
 
 		$feed_id = (int) $this->dbh->escape_string($_REQUEST["feed_id"]);
 
-		if (!ini_get("open_basedir")) {
-			update_rss_feed($feed_id, true);
-		}
+		update_rss_feed($feed_id, true);
 
 		$this->wrap(self::STATUS_OK, array("status" => "OK"));
 	}
@@ -661,8 +636,8 @@ class API extends Handler {
 	static function api_get_headlines($feed_id, $limit, $offset,
 				$filter, $is_cat, $show_excerpt, $show_content, $view_mode, $order,
 				$include_attachments, $since_id,
-				$search = "", $include_nested = false, $sanitize_content = true,
-				$force_update = false, $excerpt_length = 100, $check_first_id = false, $skip_first_id_check = false) {
+				$search = "", $search_mode = "",
+				$include_nested = false, $sanitize_content = true, $force_update = false, $excerpt_length = 100) {
 
 			if ($force_update && $feed_id > 0 && is_numeric($feed_id)) {
 				// Update the feed if required with some basic flood control
@@ -685,80 +660,51 @@ class API extends Handler {
 				}
 			}
 
-			/*$qfh_ret = queryFeedHeadlines($feed_id, $limit,
-				$view_mode, $is_cat, $search, false,
-				$order, $offset, 0, false, $since_id, $include_nested);*/
-
-			//function queryFeedHeadlines($feed, $limit,
-			// $view_mode, $cat_view, $search, $search_mode,
-			// $override_order = false, $offset = 0, $owner_uid = 0, $filter = false, $since_id = 0, $include_children = false,
-			// $ignore_vfeed_group = false, $override_strategy = false, $override_vfeed = false, $start_ts = false, $check_top_id = false) {
-
-			$params = array(
-				"feed" => $feed_id,
-				"limit" => $limit,
-				"view_mode" => $view_mode,
-				"cat_view" => $is_cat,
-				"search" => $search,
-				"override_order" => $order,
-				"offset" => $offset,
-				"since_id" => $since_id,
-				"include_children" => $include_nested,
-				"check_first_id" => $check_first_id,
-				"skip_first_id_check" => $skip_first_id_check
-			);
-
-			$qfh_ret = queryFeedHeadlines($params);
+			$qfh_ret = queryFeedHeadlines($feed_id, $limit,
+				$view_mode, $is_cat, $search, $search_mode,
+				$order, $offset, 0, false, $since_id, $include_nested);
 
 			$result = $qfh_ret[0];
 			$feed_title = $qfh_ret[1];
-			$first_id = $qfh_ret[6];
 
 			$headlines = array();
 
-			$headlines_header = array(
-				'id' => $feed_id,
-				'first_id' => $first_id,
-				'is_cat' => $is_cat);
+			while ($line = db_fetch_assoc($result)) {
+				$line["content_preview"] = truncate_string(strip_tags($line["content"]), $excerpt_length);
+				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
+					$line = $p->hook_query_headlines($line, $excerpt_length, true);
+				}
 
-			if (!is_numeric($result)) {
-				while ($line = db_fetch_assoc($result)) {
-					$line["content_preview"] = truncate_string(strip_tags($line["content"]), $excerpt_length);
-					foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
-						$line = $p->hook_query_headlines($line, $excerpt_length, true);
-					}
+				$is_updated = ($line["last_read"] == "" &&
+					($line["unread"] != "t" && $line["unread"] != "1"));
 
-					$is_updated = ($line["last_read"] == "" &&
-						($line["unread"] != "t" && $line["unread"] != "1"));
+				$tags = explode(",", $line["tag_cache"]);
 
-					$tags = explode(",", $line["tag_cache"]);
+				$label_cache = $line["label_cache"];
+				$labels = false;
 
-					$label_cache = $line["label_cache"];
-					$labels = false;
+				if ($label_cache) {
+					$label_cache = json_decode($label_cache, true);
 
 					if ($label_cache) {
-						$label_cache = json_decode($label_cache, true);
-
-						if ($label_cache) {
-							if ($label_cache["no-labels"] == 1)
-								$labels = array();
-							else
-								$labels = $label_cache;
-						}
+						if ($label_cache["no-labels"] == 1)
+							$labels = array();
+						else
+							$labels = $label_cache;
 					}
+				}
 
-					if (!is_array($labels)) $labels = get_article_labels($line["id"]);
+				if (!is_array($labels)) $labels = get_article_labels($line["id"]);
 
-					//if (!$tags) $tags = get_article_tags($line["id"]);
-					//if (!$labels) $labels = get_article_labels($line["id"]);
+				//if (!$tags) $tags = get_article_tags($line["id"]);
+				//if (!$labels) $labels = get_article_labels($line["id"]);
 
-					$headline_row = array(
+				$headline_row = array(
 						"id" => (int)$line["id"],
-						"guid" => $line["guid"],
 						"unread" => sql_bool_to_bool($line["unread"]),
 						"marked" => sql_bool_to_bool($line["marked"]),
 						"published" => sql_bool_to_bool($line["published"]),
-						"updated" => (int)strtotime($line["updated"]),
+						"updated" => (int) strtotime($line["updated"]),
 						"is_updated" => $is_updated,
 						"title" => $line["title"],
 						"link" => $line["link"],
@@ -766,55 +712,52 @@ class API extends Handler {
 						"tags" => $tags,
 					);
 
-					if ($include_attachments)
-						$headline_row['attachments'] = get_article_enclosures(
-							$line['id']);
+				if ($include_attachments)
+					$headline_row['attachments'] = get_article_enclosures(
+						$line['id']);
 
-					if ($show_excerpt)
-						$headline_row["excerpt"] = $line["content_preview"];
+				if ($show_excerpt)
+					$headline_row["excerpt"] = $line["content_preview"];
 
-					if ($show_content) {
+				if ($show_content) {
 
-						if ($sanitize_content) {
-							$headline_row["content"] = sanitize(
-								$line["content"],
-								sql_bool_to_bool($line['hide_images']),
-								false, $line["site_url"], false, $line["id"]);
-						} else {
-							$headline_row["content"] = $line["content"];
-						}
+					if ($sanitize_content) {
+						$headline_row["content"] = sanitize(
+							$line["content"],
+							sql_bool_to_bool($line['hide_images']),
+							false, $line["site_url"], false, $line["id"]);
+					} else {
+						$headline_row["content"] = $line["content"];
 					}
-
-					// unify label output to ease parsing
-					if ($labels["no-labels"] == 1) $labels = array();
-
-					$headline_row["labels"] = $labels;
-
-					$headline_row["feed_title"] = $line["feed_title"] ? $line["feed_title"] :
-						$feed_title;
-
-					$headline_row["comments_count"] = (int)$line["num_comments"];
-					$headline_row["comments_link"] = $line["comments"];
-
-					$headline_row["always_display_attachments"] = sql_bool_to_bool($line["always_display_enclosures"]);
-
-					$headline_row["author"] = $line["author"];
-
-					$headline_row["score"] = (int)$line["score"];
-					$headline_row["note"] = $line["note"];
-					$headline_row["lang"] = $line["lang"];
-
-					foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_RENDER_ARTICLE_API) as $p) {
-						$headline_row = $p->hook_render_article_api(array("headline" => $headline_row));
-					}
-
-					array_push($headlines, $headline_row);
 				}
-			} else if (is_numeric($result) && $result == -1) {
-				$headlines_header['first_id_changed'] = true;
+
+				// unify label output to ease parsing
+				if ($labels["no-labels"] == 1) $labels = array();
+
+				$headline_row["labels"] = $labels;
+
+				$headline_row["feed_title"] = $line["feed_title"] ? $line["feed_title"] :
+					$feed_title;
+
+				$headline_row["comments_count"] = (int)$line["num_comments"];
+				$headline_row["comments_link"] = $line["comments"];
+
+				$headline_row["always_display_attachments"] = sql_bool_to_bool($line["always_display_enclosures"]);
+
+				$headline_row["author"] = $line["author"];
+
+				$headline_row["score"] = (int)$line["score"];
+				$headline_row["note"] = $line["note"];
+				$headline_row["lang"] = $line["lang"];
+
+				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_RENDER_ARTICLE_API) as $p) {
+					$headline_row = $p->hook_render_article_api(array("headline" => $headline_row));
+				}
+
+				array_push($headlines, $headline_row);
 			}
 
-			return array($headlines, $headlines_header);
+			return $headlines;
 	}
 
 	function unsubscribeFeed() {

@@ -51,9 +51,9 @@ class Mail extends Plugin {
 			}
 			</script>";
 
-			print_hidden("op", "pluginhandler");
-			print_hidden("method", "save");
-			print_hidden("plugin", "mail");
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pluginhandler\">";
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"save\">";
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"plugin\" value=\"mail\">";
 
 			$addresslist = $this->host->get($this, "addresslist");
 
@@ -79,9 +79,9 @@ class Mail extends Plugin {
 
 		$param = db_escape_string($_REQUEST['param']);
 
-		print_hidden("op", "pluginhandler");
-		print_hidden("plugin", "mail");
-		print_hidden("method", "sendEmail");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pluginhandler\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"plugin\" value=\"mail\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"sendEmail\">";
 
 		$result = db_query("SELECT email, full_name FROM ttrss_users WHERE
 			id = " . $_SESSION["uid"]);
@@ -91,8 +91,8 @@ class Mail extends Plugin {
 
 		if (!$user_name) $user_name = $_SESSION['name'];
 
-		print_hidden("from_email", "$user_email");
-		print_hidden("from_name", "$user_name");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"from_email\" value=\"$user_email\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"from_name\" value=\"$user_name\">";
 
 		require_once "lib/MiniTemplator.class.php";
 
@@ -162,8 +162,7 @@ class Mail extends Plugin {
 
 		print "</td></tr>";
 
-		print "<tr><td colspan='2'><textarea dojoType=\"dijit.form.SimpleTextarea\" 
-			style='height : 200px; font-size : 12px; width : 98%' rows=\"20\"
+		print "<tr><td colspan='2'><textarea dojoType=\"dijit.form.SimpleTextarea\" style='font-size : 12px; width : 100%' rows=\"20\"
 			name='content'>$content</textarea>";
 
 		print "</td></tr></table>";

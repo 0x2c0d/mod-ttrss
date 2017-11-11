@@ -70,17 +70,6 @@ abstract class FeedItem_Common extends FeedItem {
 		}
 	}
 
-	function count_children($node) {
-		return $node->getElementsByTagName("*")->length;
-	}
-
-	function subtree_or_text($node) {
-		if ($this->count_children($node) == 0) {
-			return $node->nodeValue;
-		} else {
-			return $node->c14n();
-		}
-	}
 
 }
 ?>

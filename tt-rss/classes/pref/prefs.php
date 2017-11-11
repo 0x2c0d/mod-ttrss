@@ -23,6 +23,7 @@ class Pref_Prefs extends Handler_Protected {
 
 		$this->pref_help = array(
 			"ALLOW_DUPLICATE_POSTS" => array(__("Allow duplicate articles"), ""),
+			"AUTO_ASSIGN_LABELS" => array(__("Assign articles to labels automatically"), ""),
 			"BLACKLISTED_TAGS" => array(__("Blacklisted tags"), __("When auto-detecting tags in articles these tags will not be applied (comma-separated list).")),
 			"CDM_AUTO_CATCHUP" => array(__("Automatically mark articles as read"), __("This option enables marking articles as read automatically while you scroll article list.")),
 			"CDM_EXPANDED" => array(__("Automatically expand articles in combined mode"), ""),
@@ -65,26 +66,26 @@ class Pref_Prefs extends Handler_Protected {
 		$con_pw = $_POST["confirm_password"];
 
 		if ($old_pw == "") {
-			print "ERROR: ".format_error("Old password cannot be blank.");
+			print "ERROR: ".__("Old password cannot be blank.");
 			return;
 		}
 
 		if ($new_pw == "") {
-			print "ERROR: ".format_error("New password cannot be blank.");
+			print "ERROR: ".__("New password cannot be blank.");
 			return;
 		}
 
 		if ($new_pw != $con_pw) {
-			print "ERROR: ".format_error("Entered passwords do not match.");
+			print "ERROR: ".__("Entered passwords do not match.");
 			return;
 		}
 
 		$authenticator = PluginHost::getInstance()->get_plugin($_SESSION["auth_module"]);
 
 		if (method_exists($authenticator, "change_password")) {
-			print format_notice($authenticator->change_password($_SESSION["uid"], $old_pw, $new_pw));
+			print $authenticator->change_password($_SESSION["uid"], $old_pw, $new_pw);
 		} else {
-			print "ERROR: ".format_error("Function not supported by authentication module.");
+			print "ERROR: ".__("Function not supported by authentication module.");
 		}
 	}
 
@@ -127,6 +128,21 @@ class Pref_Prefs extends Handler_Protected {
 		}
 	}
 
+	function getHelp() {
+
+		$pref_name = $this->dbh->escape_string($_REQUEST["pn"]);
+
+		$result = $this->dbh->query("SELECT help_text FROM ttrss_prefs
+			WHERE pref_name = '$pref_name'");
+
+		if ($this->dbh->num_rows($result) > 0) {
+			$help_text = $this->dbh->fetch_result($result, 0, "help_text");
+			print $help_text;
+		} else {
+			printf(__("Unknown option: %s"), $pref_name);
+		}
+	}
+
 	function changeemail() {
 
 		$email = $this->dbh->escape_string($_POST["email"]);
@@ -164,7 +180,7 @@ class Pref_Prefs extends Handler_Protected {
 
 		global $access_level_names;
 
-		$prefs_blacklist = array("ALLOW_DUPLICATE_POSTS", "STRIP_UNSAFE_TAGS", "REVERSE_HEADLINES",
+		$prefs_blacklist = array("STRIP_UNSAFE_TAGS", "REVERSE_HEADLINES",
 			"SORT_HEADLINES_BY_FEED_DATE", "DEFAULT_ARTICLE_LIMIT",
 			"FEEDS_SORT_BY_UNREAD");
 
@@ -226,8 +242,8 @@ class Pref_Prefs extends Handler_Protected {
 
 		print "</table>";
 
-		print_hidden("op", "pref-prefs");
-		print_hidden("method", "changeemail");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"changeemail\">";
 
 		print "<p><button dojoType=\"dijit.form.Button\" type=\"submit\">".
 			__("Save data")."</button>";
@@ -243,8 +259,6 @@ class Pref_Prefs extends Handler_Protected {
 		if ($authenticator && method_exists($authenticator, "change_password")) {
 
 			print "<h2>" . __("Password") . "</h2>";
-
-			print "<div style='display : none' id='pwd_change_infobox'></div>";
 
 			$result = $this->dbh->query("SELECT id FROM ttrss_users
 				WHERE id = ".$_SESSION["uid"]." AND pwd_hash
@@ -266,20 +280,12 @@ class Pref_Prefs extends Handler_Protected {
 					onComplete: function(transport) {
 						notify('');
 						if (transport.responseText.indexOf('ERROR: ') == 0) {
-
-							$('pwd_change_infobox').innerHTML =
-								transport.responseText.replace('ERROR: ', '');
-
+							notify_error(transport.responseText.replace('ERROR: ', ''));
 						} else {
-							$('pwd_change_infobox').innerHTML =
-								transport.responseText.replace('ERROR: ', '');
-
+							notify_info(transport.responseText);
 							var warn = $('default_pass_warning');
 							if (warn) Element.hide(warn);
 						}
-
-						new Effect.Appear('pwd_change_infobox');
-
 				}});
 				this.reset();
 			}
@@ -305,8 +311,8 @@ class Pref_Prefs extends Handler_Protected {
 
 			print "</table>";
 
-			print_hidden("op", "pref-prefs");
-			print_hidden("method", "changepassword");
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
+			print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"changepassword\">";
 
 			print "<p><button dojoType=\"dijit.form.Button\" type=\"submit\">".
 				__("Change password")."</button>";
@@ -351,8 +357,8 @@ class Pref_Prefs extends Handler_Protected {
 
 				print "</table>";
 
-				print_hidden("op", "pref-prefs");
-				print_hidden("method", "otpdisable");
+				print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
+				print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"otpdisable\">";
 
 				print "<p><button dojoType=\"dijit.form.Button\" type=\"submit\">".
 					__("Disable OTP")."</button>";
@@ -371,8 +377,8 @@ class Pref_Prefs extends Handler_Protected {
 
 					print "<form dojoType=\"dijit.form.Form\" id=\"changeOtpForm\">";
 
-					print_hidden("op", "pref-prefs");
-					print_hidden("method", "otpenable");
+					print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
+					print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"otpenable\">";
 
 					print "<script type=\"dojo/method\" event=\"onSubmit\" args=\"evt\">
 					evt.preventDefault();
@@ -565,12 +571,8 @@ class Pref_Prefs extends Handler_Protected {
 
 			} else if ($pref_name == "USER_CSS_THEME") {
 
-				$themes = array_merge(glob("themes/*.php"), glob("themes/*.css"), glob("themes.local/*.css"));
-				$themes = array_map("basename", $themes);
-				$themes = array_filter($themes, "theme_valid");
-				asort($themes);
-
-				if (!theme_valid($value)) $value = "default.php";
+				$themes = array_filter(array_map("basename", glob("themes/*.css")),
+					"theme_valid");
 
 				print_select($pref_name, $value, $themes,
 					'dojoType="dijit.form.Select"');
@@ -624,8 +626,6 @@ class Pref_Prefs extends Handler_Protected {
 				$cert_serial = htmlspecialchars(get_ssl_certificate_id());
 				$has_serial = ($cert_serial) ? "false" : "true";
 
-				print "<br/>";
-
 				print " <button dojoType=\"dijit.form.Button\" disabled=\"$has_serial\"
 					onclick=\"insertSSLserial('$cert_serial')\">" .
 					__('Register') . "</button>";
@@ -658,7 +658,7 @@ class Pref_Prefs extends Handler_Protected {
 
 		$listed_boolean_prefs = htmlspecialchars(join(",", $listed_boolean_prefs));
 
-		print_hidden("boolean_prefs", "$listed_boolean_prefs");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"boolean_prefs\" value=\"$listed_boolean_prefs\">";
 
 		PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB_SECTION,
 			"hook_prefs_tab_section", "prefPrefsPrefsInside");
@@ -666,8 +666,8 @@ class Pref_Prefs extends Handler_Protected {
 		print '</div>'; # inside pane
 		print '<div dojoType="dijit.layout.ContentPane" region="bottom">';
 
-		print_hidden("op", "pref-prefs");
-		print_hidden("method", "saveconfig");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"saveconfig\">";
 
 		print "<div dojoType=\"dijit.form.ComboButton\" type=\"submit\">
 			<span>".__('Save configuration')."</span>
@@ -686,6 +686,16 @@ class Pref_Prefs extends Handler_Protected {
 
 		print "&nbsp;";
 
+		/* $checked = $_SESSION["prefs_show_advanced"] ? "checked='1'" : "";
+
+		print "<input onclick='toggleAdvancedPrefs()'
+				id='prefs_show_advanced'
+				dojoType=\"dijit.form.CheckBox\"
+				$checked
+				type=\"checkbox\"></input>
+				<label for='prefs_show_advanced'>" .
+				__("Show additional preferences") . "</label>"; */
+
 		PluginHost::getInstance()->run_hooks(PluginHost::HOOK_PREFS_TAB_SECTION,
 			"hook_prefs_tab_section", "prefPrefsPrefsOutside");
 
@@ -700,10 +710,6 @@ class Pref_Prefs extends Handler_Protected {
 		print "<p>" . __("You will need to reload Tiny Tiny RSS for plugin changes to take effect.") . "</p>";
 
 		print_notice(__("Download more plugins at tt-rss.org <a class=\"visibleLink\" target=\"_blank\" href=\"http://tt-rss.org/forum/viewforum.php?f=22\">forums</a> or <a target=\"_blank\" class=\"visibleLink\" href=\"http://tt-rss.org/wiki/Plugins\">wiki</a>."));
-
-		if (ini_get("open_basedir") && function_exists("curl_init") && !defined("NO_CURL")) {
-			print_warning("Your PHP configuration has open_basedir restrictions enabled. Some plugins relying on CURL for functionality may not work correctly.");
-		}
 
 		print "<form dojoType=\"dijit.form.Form\" id=\"changePluginsForm\">";
 
@@ -724,8 +730,8 @@ class Pref_Prefs extends Handler_Protected {
 		}
 		</script>";
 
-		print_hidden("op", "pref-prefs");
-		print_hidden("method", "setplugins");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-prefs\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"setplugins\">";
 
 		print "<table width='100%' class='prefPluginsList'>";
 
@@ -742,13 +748,13 @@ class Pref_Prefs extends Handler_Protected {
 		$user_enabled = array_map("trim", explode(",", get_pref("_ENABLED_PLUGINS")));
 
 		$tmppluginhost = new PluginHost();
-		$tmppluginhost->load_all($tmppluginhost::KIND_ALL, $_SESSION["uid"], true);
+		$tmppluginhost->load_all($tmppluginhost::KIND_ALL, $_SESSION["uid"]);
 		$tmppluginhost->load_data(true);
 
 		foreach ($tmppluginhost->get_plugins() as $name => $plugin) {
 			$about = $plugin->about();
 
-			if ($about[3]) {
+			if ($about[3] && strpos($name, "example") === FALSE) {
 				if (in_array($name, $system_enabled)) {
 					$checked = "checked='1'";
 				} else {
@@ -766,7 +772,7 @@ class Pref_Prefs extends Handler_Protected {
 				print "<td><label><img src='images/$plugin_icon' alt=''> $name</label></td>";
 				print "<td>" . htmlspecialchars($about[1]);
 				if (@$about[4]) {
-					print " &mdash; <a target=\"_blank\" rel=\"noopener noreferrer\" class=\"visibleLink\"
+					print " &mdash; <a target=\"_blank\" class=\"visibleLink\"
 						href=\"".htmlspecialchars($about[4])."\">".__("more info")."</a>";
 				}
 				print "</td>";
@@ -798,7 +804,7 @@ class Pref_Prefs extends Handler_Protected {
 		foreach ($tmppluginhost->get_plugins() as $name => $plugin) {
 			$about = $plugin->about();
 
-			if (!$about[3]) {
+			if (!$about[3] && strpos($name, "example") === FALSE) {
 
 				if (in_array($name, $system_enabled)) {
 					$checked = "checked='1'";
@@ -825,7 +831,7 @@ class Pref_Prefs extends Handler_Protected {
 				print "<td><label for='FPCHK-$name'><img src='images/$plugin_icon' alt=''> $name</label></td>";
 				print "<td><label for='FPCHK-$name'>" . htmlspecialchars($about[1]) . "</label>";
 				if (@$about[4]) {
-					print " &mdash; <a target=\"_blank\" rel=\"noopener noreferrer\" class=\"visibleLink\"
+					print " &mdash; <a target=\"_blank\" class=\"visibleLink\"
 						href=\"".htmlspecialchars($about[4])."\">".__("more info")."</a>";
 				}
 				print "</td>";
@@ -965,13 +971,13 @@ class Pref_Prefs extends Handler_Protected {
 
 		print_notice(T_sprintf("You can override colors, fonts and layout of your currently selected theme with custom CSS declarations here. <a target=\"_blank\" class=\"visibleLink\" href=\"%s\">This file</a> can be used as a baseline.", "css/tt-rss.css"));
 
-		print_hidden("op", "rpc");
-		print_hidden("method", "setpref");
-		print_hidden("key", "USER_STYLESHEET");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"rpc\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"setpref\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"key\" value=\"USER_STYLESHEET\">";
 
 		print "<table width='100%'><tr><td>";
 		print "<textarea dojoType=\"dijit.form.SimpleTextarea\"
-			style='font-size : 12px; width : 98%; height: 200px;'
+			style='font-size : 12px; width : 100%; height: 200px;'
 			placeHolder='body#ttrssMain { font-size : 14px; };'
 			name='value'>$value</textarea>";
 		print "</td></tr></table>";

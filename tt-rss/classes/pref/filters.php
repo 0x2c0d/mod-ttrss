@@ -43,12 +43,8 @@ class Pref_Filters extends Handler_Protected {
 		return;
 	}
 
-	function testFilterDo() {
-		require_once "include/rssfuncs.php";
 
-		$offset = (int) db_escape_string($_REQUEST["offset"]);
-		$limit = (int) db_escape_string($_REQUEST["limit"]);
-
+	function testFilter() {
 		$filter = array();
 
 		$filter["enabled"] = true;
@@ -58,7 +54,6 @@ class Pref_Filters extends Handler_Protected {
 			checkbox_to_sql_bool($this->dbh->escape_string($_REQUEST["inverse"])));
 
 		$filter["rules"] = array();
-		$filter["actions"] = array("dummy-action");
 
 		$result = $this->dbh->query("SELECT id,name FROM ttrss_filter_types");
 
@@ -66,8 +61,6 @@ class Pref_Filters extends Handler_Protected {
 		while ($line = $this->dbh->fetch_assoc($result)) {
 			$filter_types[$line["id"]] = $line["name"];
 		}
-
-		$scope_qparts = array();
 
 		$rctr = 0;
 		foreach ($_REQUEST["rule"] AS $r) {
@@ -82,14 +75,6 @@ class Pref_Filters extends Handler_Protected {
 					unset($rule["feed_id"]);
 				}
 
-				if (isset($rule["feed_id"]) && $rule['feed_id'] > 0) {
-					array_push($scope_qparts, "feed_id = " . $rule["feed_id"]);
-				} else if (isset($rule["cat_id"])) {
-					array_push($scope_qparts, "cat_id = " . $rule["cat_id"]);
-				} else {
-					array_push($scope_qparts, "true");
-				}
-
 				array_push($filter["rules"], $rule);
 
 				++$rctr;
@@ -98,105 +83,61 @@ class Pref_Filters extends Handler_Protected {
 			}
 		}
 
-		$glue = $filter['match_any_rule'] ? " OR " :  " AND ";
-		$scope_qpart = join($glue, $scope_qparts);
+		$qfh_ret = queryFeedHeadlines(-4, 30, "", false, false, false,
+			"date_entered DESC", 0, $_SESSION["uid"], $filter);
 
-		if (!$scope_qpart) $scope_qpart = "true";
+		$result = $qfh_ret[0];
 
-		$rv = array();
+		$found = 0;
 
-		//while ($found < $limit && $offset < $limit * 1000 && time() - $started < ini_get("max_execution_time") * 0.7) {
+		print __("Articles matching this filter:");
 
-			$result = db_query("SELECT ttrss_entries.id,
-					ttrss_entries.title,
-					ttrss_feeds.id AS feed_id,
-					ttrss_feeds.title AS feed_title,
-					ttrss_feed_categories.id AS cat_id,
-					content,
-					date_entered,
-					link,
-					author,
-					tag_cache
-				FROM
-					ttrss_entries, ttrss_user_entries
-						LEFT JOIN ttrss_feeds ON (feed_id = ttrss_feeds.id)
-						LEFT JOIN ttrss_feed_categories ON (ttrss_feeds.cat_id = ttrss_feed_categories.id)
-				WHERE
-					ref_id = ttrss_entries.id AND
-					($scope_qpart) AND
-					ttrss_user_entries.owner_uid = " . $_SESSION["uid"] . "
-				ORDER BY date_entered DESC LIMIT $limit OFFSET $offset");
+		print "<div class=\"filterTestHolder\">";
+		print "<table width=\"100%\" cellspacing=\"0\" id=\"prefErrorFeedList\">";
 
-			while ($line = db_fetch_assoc($result)) {
+		while ($line = $this->dbh->fetch_assoc($result)) {
+			$line["content_preview"] = truncate_string(strip_tags($line["content"]), 100, '...');
 
-				$rc = get_article_filters(array($filter), $line['title'], $line['content'], $line['link'],
-					false, $line['author'], explode(",", $line['tag_cache']));
-
-				if (count($rc) > 0) {
-
-					$line["content_preview"] = truncate_string(strip_tags($line["content"]), 200, '&hellip;');
-
-					foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
-						$line = $p->hook_query_headlines($line, 100);
-					}
-
-					$content_preview = $line["content_preview"];
-
-					$tmp = "<tr style='margin-top : 5px'>";
-
-					#$tmp .= "<td width='5%' align='center'><input dojoType=\"dijit.form.CheckBox\"
-					#	checked=\"1\" disabled=\"1\" type=\"checkbox\"></td>";
-
-					$id = $line['id'];
-					$tmp .= "<td width='5%' align='center'><img style='cursor : pointer' title='".__("Preview article")."'
-						src='images/information.png' onclick='openArticlePopup($id)'></td><td>";
-
-					/*foreach ($filter['rules'] as $rule) {
-						$reg_exp = str_replace('/', '\/', $rule["reg_exp"]);
-
-						$line["title"] = preg_replace("/($reg_exp)/i",
-							"<span class=\"highlight\">$1</span>", $line["title"]);
-
-						$content_preview = preg_replace("/($reg_exp)/i",
-							"<span class=\"highlight\">$1</span>", $content_preview);
-					}*/
-
-					$tmp .= "<strong>" . $line["title"] . "</strong><br/>";
-					$tmp .= $line['feed_title'] . ", " . mb_substr($line["date_entered"], 0, 16);
-					$tmp .= "<div class='insensitive'>" . $content_preview . "</div>";
-					$tmp .= "</td></tr>";
-
-					array_push($rv, $tmp);
-
-					/*array_push($rv, array("title" => $line["title"],
-						"content" => $content_preview,
-						"date" => $line["date_entered"],
-						"feed" => $line["feed_title"])); */
-
+			foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
+					$line = $p->hook_query_headlines($line, 100);
 				}
-			}
 
-			//$offset += $limit;
-		//}
+			$content_preview = $line["content_preview"];
 
-		/*if ($found == 0) {
+			if ($line["feed_title"])
+				$feed_title = $line["feed_title"];
+
+			print "<tr>";
+
+			print "<td width='5%' align='center'><input
+				dojoType=\"dijit.form.CheckBox\" checked=\"1\"
+				disabled=\"1\" type=\"checkbox\"></td>";
+			print "<td>";
+
+			print $line["title"];
+			print "&nbsp;(";
+			print "<b>" . $feed_title . "</b>";
+			print "):&nbsp;";
+			print "<span class=\"insensitive\">" . $content_preview . "</span>";
+			print " " . mb_substr($line["date_entered"], 0, 16);
+
+			print "</td></tr>";
+
+			$found++;
+		}
+
+		if ($found == 0) {
 			print "<tr><td align='center'>" .
 				__("No recent articles matching this filter have been found.");
-		}*/
 
-		print json_encode($rv);
-	}
+			print "</td></tr><tr><td class='insensitive' align='center'>";
 
-	function testFilter() {
+			print __("Complex expressions might not give results while testing due to issues with database server regexp implementation.");
 
-		if (isset($_REQUEST["offset"])) return $this->testFilterDo();
+			print "</td></tr>";
 
-		//print __("Articles matching this filter:");
+		}
 
-		print "<div><img id='prefFilterLoadingIndicator' src='images/indicator_tiny.gif'>&nbsp;<span id='prefFilterProgressMsg'>Looking for articles...</span></div>";
-
-		print "<br/><div class=\"filterTestHolder\">";
-		print "<table width=\"100%\" cellspacing=\"0\" id=\"prefFilterTestResultList\">";
 		print "</table></div>";
 
 		print "<div style='text-align : center'>";
@@ -216,8 +157,7 @@ class Pref_Filters extends Handler_Protected {
 			FROM
 				ttrss_filters2_rules, ttrss_filter_types
 			WHERE
-				filter_id = '$filter_id' AND filter_type = ttrss_filter_types.id
-			ORDER BY reg_exp");
+				filter_id = '$filter_id' AND filter_type = ttrss_filter_types.id");
 
 		$rv = "";
 
@@ -233,7 +173,7 @@ class Pref_Filters extends Handler_Protected {
 			$inverse = sql_bool_to_bool($line["inverse"]) ? "inverse" : "";
 
 			$rv .= "<span class='$inverse'>" . T_sprintf("%s on %s in %s %s",
-				htmlspecialchars($line["reg_exp"]),
+				strip_tags($line["reg_exp"]),
 				$line["field"],
 				$where,
 				sql_bool_to_bool($line["inverse"]) ? __("(inverse)") : "") . "</span>";
@@ -340,10 +280,10 @@ class Pref_Filters extends Handler_Protected {
 
 		print "<form id=\"filter_edit_form\" onsubmit='return false'>";
 
-		print_hidden("op", "pref-filters");
-		print_hidden("id", "$filter_id");
-		print_hidden("method", "editSave");
-		print_hidden("csrf_token", $_SESSION['csrf_token']);
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-filters\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"id\" value=\"$filter_id\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"editSave\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"csrf_token\" value=\"".$_SESSION['csrf_token']."\">";
 
 		print "<div class=\"dlgSec\">".__("Caption")."</div>";
 
@@ -514,7 +454,7 @@ class Pref_Filters extends Handler_Protected {
 		$inverse = isset($rule["inverse"]) ? "inverse" : "";
 
 		return "<span class='filterRule $inverse'>" .
-			T_sprintf("%s on %s in %s %s", htmlspecialchars($rule["reg_exp"]),
+			T_sprintf("%s on %s in %s %s", strip_tags($rule["reg_exp"]),
 			$filter_type, $feed, isset($rule["inverse"]) ? __("(inverse)") : "") . "</span>";
 	}
 
@@ -531,21 +471,6 @@ class Pref_Filters extends Handler_Protected {
 		if ($action["action_id"] == 4 || $action["action_id"] == 6 ||
 			$action["action_id"] == 7)
 				$title .= ": " . $action["action_param"];
-
-		if ($action["action_id"] == 9) {
-			list ($pfclass, $pfaction) = explode(":", $action["action_param"]);
-
-			$filter_actions = PluginHost::getInstance()->get_filter_actions();
-
-			foreach ($filter_actions as $fclass => $factions) {
-				foreach ($factions as $faction) {
-					if ($pfaction == $faction["action"] && $pfclass == $fclass) {
-						$title .= ": " . $fclass . ": " . $faction["description"];
-						break;
-					}
-				}
-			}
-		}
 
 		return $title;
 	}
@@ -619,7 +544,7 @@ class Pref_Filters extends Handler_Protected {
 			foreach ($rules as $rule) {
 				if ($rule) {
 
-					$reg_exp = $this->dbh->escape_string(trim($rule["reg_exp"]), false);
+					$reg_exp = strip_tags($this->dbh->escape_string(trim($rule["reg_exp"])));
 					$inverse = isset($rule["inverse"]) ? "true" : "false";
 
 					$filter_type = (int) $this->dbh->escape_string(trim($rule["filter_type"]));
@@ -816,9 +741,9 @@ class Pref_Filters extends Handler_Protected {
 
 		print "<form name='filter_new_form' id='filter_new_form'>";
 
-		print_hidden("op", "pref-filters");
-		print_hidden("method", "add");
-		print_hidden("csrf_token", $_SESSION['csrf_token']);
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"op\" value=\"pref-filters\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"method\" value=\"add\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\" name=\"csrf_token\" value=\"".$_SESSION['csrf_token']."\">";
 
 		print "<div class=\"dlgSec\">".__("Caption")."</div>";
 
@@ -1017,18 +942,16 @@ class Pref_Filters extends Handler_Protected {
 
 		print "</select>";
 
-		$param_box_hidden = ($action_id == 7 || $action_id == 4 || $action_id == 6 || $action_id == 9) ?
+		$param_box_hidden = ($action_id == 7 || $action_id == 4 || $action_id == 6) ?
 			"" : "display : none";
 
 		$param_hidden = ($action_id == 4 || $action_id == 6) ?
 			"" : "display : none";
 
 		$label_param_hidden = ($action_id == 7) ?	"" : "display : none";
-		$plugin_param_hidden = ($action_id == 9) ?	"" : "display : none";
 
 		print "<span id=\"filterDlg_paramBox\" style=\"$param_box_hidden\">";
-		print " ";
-		//print " " . __("with parameters:") . " ";
+		print " " . __("with parameters:") . " ";
 		print "<input dojoType=\"dijit.form.TextBox\"
 			id=\"filterDlg_actionParam\" style=\"$param_hidden\"
 			name=\"action_param\" value=\"$action_param\">";
@@ -1036,30 +959,6 @@ class Pref_Filters extends Handler_Protected {
 		print_label_select("action_param_label", $action_param,
 			"id=\"filterDlg_actionParamLabel\" style=\"$label_param_hidden\"
 			dojoType=\"dijit.form.Select\"");
-
-		$filter_actions = PluginHost::getInstance()->get_filter_actions();
-		$filter_action_hash = array();
-
-		foreach ($filter_actions as $fclass => $factions) {
-			foreach ($factions as $faction) {
-
-				$filter_action_hash[$fclass . ":" . $faction["action"]] =
-					$fclass . ": " . $faction["description"];
-			}
-		}
-
-		if (count($filter_action_hash) == 0) {
-			$filter_plugin_disabled = "disabled";
-
-			$filter_action_hash["no-data"] = __("No actions available");
-
-		} else {
-			$filter_plugin_disabled = "";
-		}
-
-		print_select_hash("filterDlg_actionParamPlugin", $action_param, $filter_action_hash,
-			"style=\"$plugin_param_hidden\" dojoType=\"dijit.form.Select\" $filter_plugin_disabled",
-			"action_param_plugin");
 
 		print "</span>";
 
@@ -1083,21 +982,19 @@ class Pref_Filters extends Handler_Protected {
 	private function getFilterName($id) {
 
 		$result = $this->dbh->query(
-			"SELECT title,match_any_rule,COUNT(DISTINCT r.id) AS num_rules,COUNT(DISTINCT a.id) AS num_actions
+			"SELECT title,COUNT(DISTINCT r.id) AS num_rules,COUNT(DISTINCT a.id) AS num_actions
 				FROM ttrss_filters2 AS f LEFT JOIN ttrss_filters2_rules AS r
 					ON (r.filter_id = f.id)
 						LEFT JOIN ttrss_filters2_actions AS a
-							ON (a.filter_id = f.id) WHERE f.id = '$id' GROUP BY f.title, f.match_any_rule");
+							ON (a.filter_id = f.id) WHERE f.id = '$id' GROUP BY f.title");
 
 		$title = $this->dbh->fetch_result($result, 0, "title");
 		$num_rules = $this->dbh->fetch_result($result, 0, "num_rules");
 		$num_actions = $this->dbh->fetch_result($result, 0, "num_actions");
-		$match_any_rule = sql_bool_to_bool($this->dbh->fetch_result($result, 0, "match_any_rule"));
 
 		if (!$title) $title = __("[No caption]");
 
-		$title = sprintf(_ngettext("%s (%d rule)", "%s (%d rules)", (int) $num_rules), $title, $num_rules);
-
+		$title = sprintf(_ngettext("%s (%d rule)", "%s (%d rules)", $num_rules), $title, $num_rules);
 
 		$result = $this->dbh->query(
 			"SELECT * FROM ttrss_filters2_actions WHERE filter_id = '$id' ORDER BY id LIMIT 1");
@@ -1111,10 +1008,8 @@ class Pref_Filters extends Handler_Protected {
 			$num_actions -= 1;
 		}
 
-		if ($match_any_rule) $title .= " (" . __("matches any rule") . ")";
-
 		if ($num_actions > 0)
-			$actions = sprintf(_ngettext("%s (+%d action)", "%s (+%d actions)", (int) $num_actions), $actions, $num_actions);
+			$actions = sprintf(_ngettext("%s (+%d action)", "%s (+%d actions)", $num_actions), $actions, $num_actions);
 
 		return array($title, $actions);
 	}

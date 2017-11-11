@@ -2,7 +2,7 @@ div.cdmHeader img, div.cdmHeader input, div.cdmFooter img {
 	vertical-align : middle;
 }
 
-div.cdmHeader, div.cdmFooter {
+div.cdmHeader {
 	display : table;
 }
 
@@ -11,16 +11,11 @@ div.cdmHeader > * {
 	padding : 5px;
 }
 
-div.cdmFooter > * {
-	display : table-cell;
-	vertical-align : middle;
-}
-
-div.cdmHeader > div, div.cdmFooter > div {
+div.cdmHeader > div {
 	white-space : nowrap;
 }
 
-div.cdmHeader > span, div.cdmFooter > span.left {
+div.cdmHeader > span {
 	width : 100%;
 }
 
@@ -55,18 +50,13 @@ div.cdmHeader input {
 	margin-right : 4px;
 }
 
-div.cdmIntermediate {
-	margin : 10px;
-}
-
 div.cdmContentInner {
 	margin : 10px;
 	line-height : 1.5;
-	font-size : 16px;
+	font-size : 15px;
 }
 
-div.cdmContentInner img,
-div.cdmContentInner video {
+div.cdmContentInner img {
 	border-width : 0px;
 	max-width : 98%;
 	height : auto;
@@ -83,8 +73,7 @@ div.cdmContentInner h4 {
 }
 
 div.cdmFooter {
-	height : 30px;
-	padding-left : 5px;
+	padding : 5px;
 	font-weight : normal;
 	color : #555;
 	clear : both;
@@ -161,7 +150,7 @@ div.cdm.expandable.Unread div.cdmHeader a.title {
 }
 
 div.cdm.expandable.active div.cdmHeader a.title {
-	color : #0088cc;
+	color : #4684ff;
 	font-size : 16px;
 	font-weight : 600;
 	text-rendering: optimizelegibility;
@@ -191,7 +180,7 @@ div.cdm.expanded.active {
 }
 
 div.cdm.expanded.active div.cdmHeader a.title {
-	color : #0088cc;
+	color : #4684ff;
 }
 
 div.cdm.expanded.Unread div.cdmHeader a.title {
@@ -211,7 +200,6 @@ div.cdm.active div.cdmContent {
 }
 
 span.cdmExcerpt {
-	white-space : nowrap;
 	font-size : 11px;
 	color : #999;
 	font-weight : normal;
@@ -224,14 +212,17 @@ div.cdmContent div.postEnclosures {
 }
 
 div.cdmFeedTitle {
-	border-color : #0088cc;
+	border-color : #a0a0a0;
 	border-width : 0px 0px 1px 0px;
 	border-style : solid;
 	padding : 5px 3px 5px 5px;
+	background : url("../images/toolbar.png") bottom left;
+	background-repeat : repeat-x;
 }
 
 div.cdmFeedTitle a.title {
 	color : #555;
+	font-style : italic;
 	font-weight : bold;
 }
 
@@ -240,7 +231,7 @@ div.cdmFeedTitle a {
 }
 
 div.cdmFeedTitle a:hover {
-	color : #0088cc;
+	color : #4684ff;
 }
 
 div.cdmHeader span.hlFeed {
@@ -264,7 +255,7 @@ div.cdm .hlFeed a {
 }
 
 div.cdmContentInner p {
-	/*max-width : 650px;*/
+	max-width : 650px;
 	-webkit-hyphens: auto;
 	-moz-hyphens: auto;
 	hyphens: auto;
@@ -272,11 +263,9 @@ div.cdmContentInner p {
 
 div.cdmContentInner iframe {
 	min-width : 50%;
-	max-width : 98%;
 }
 
 div.cdmHeader span.author {
-	white-space : nowrap;
 	color : #555;
 	font-size : 11px;
 	font-weight : normal;
@@ -406,6 +395,6 @@ div.cdmFeedTitle a.catchup {
 }
 
 div.cdmFeedTitle a.catchup:hover {
-	color : #0088cc;
+	color : #4684ff;
 }
 

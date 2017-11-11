@@ -51,14 +51,6 @@ class FeedItem_RSS extends FeedItem_Common {
 	}
 
 	function get_title() {
-		$title = $this->xpath->query("title", $this->elem)->item(0);
-
-		if ($title) {
-			return trim($title->nodeValue);
-		}
-
-		// if the document has a default namespace then querying for
-		// title would fail because of reasons so let's try the old way
 		$title = $this->elem->getElementsByTagName("title")->item(0);
 
 		if ($title) {
@@ -71,19 +63,17 @@ class FeedItem_RSS extends FeedItem_Common {
 		$contentB = $this->elem->getElementsByTagName("description")->item(0);
 
 		if ($contentA && !$contentB) {
-			return $this->subtree_or_text($contentA);
+			return $contentA->nodeValue;
 		}
 
 
 		if ($contentB && !$contentA) {
-			return $this->subtree_or_text($contentB);
+			return $contentB->nodeValue;
 		}
 
 		if ($contentA && $contentB) {
-			$resultA = $this->subtree_or_text($contentA);
-			$resultB = $this->subtree_or_text($contentB);
-
-			return mb_strlen($resultA) > mb_strlen($resultB) ? $resultA : $resultB;
+			return mb_strlen($contentA->nodeValue) > mb_strlen($contentB->nodeValue) ?
+				$contentA->nodeValue : $contentB->nodeValue;
 		}
 	}
 

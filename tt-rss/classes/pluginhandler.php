@@ -11,10 +11,10 @@ class PluginHandler extends Handler_Protected {
 			if (method_exists($plugin, $method)) {
 				$plugin->$method();
 			} else {
-				print error_json(13);
+				print json_encode(array("error" => "METHOD_NOT_FOUND"));
 			}
 		} else {
-			print error_json(14);
+			print json_encode(array("error" => "PLUGIN_NOT_FOUND"));
 		}
 	}
 }

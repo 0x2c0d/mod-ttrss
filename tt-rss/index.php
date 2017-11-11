@@ -66,9 +66,9 @@
 	<?php if ($_SESSION["uid"]) {
 		$theme = get_pref( "USER_CSS_THEME", $_SESSION["uid"], false);
 		if ($theme && theme_valid("$theme")) {
-			echo stylesheet_tag(get_theme_path($theme));
+			echo stylesheet_tag("themes/$theme");
 		} else {
-			echo stylesheet_tag("themes/default.php");
+			echo stylesheet_tag("themes/default.css");
 		}
 	}
 	?>
@@ -88,16 +88,6 @@
 	<link rel="shortcut icon" type="image/png" href="images/favicon.png"/>
 	<link rel="icon" type="image/png" sizes="72x72" href="images/favicon-72px.png" />
 
-	<script>
-		dojoConfig = {
-			async: true,
-			cacheBust: new Date(),
-			packages: [
-				{ name: "fox", location: "../../js" },
-			]
-		};
-	</script>
-
 	<?php
 	foreach (array("lib/prototype.js",
 				"lib/scriptaculous/scriptaculous.js?load=effects,controls",
@@ -115,16 +105,11 @@
 		require_once 'lib/jshrink/Minifier.php';
 
 		print get_minified_js(array("tt-rss",
-			"functions", "feedlist", "viewfeed", "PluginHost"));
+			"functions", "feedlist", "viewfeed", "FeedTree", "PluginHost"));
 
 		foreach (PluginHost::getInstance()->get_plugins() as $n => $p) {
 			if (method_exists($p, "get_js")) {
-				echo "try {";
 				echo JShrink\Minifier::minify($p->get_js());
-				echo "} catch (e) {
-				 	console.warn('failed to initialize plugin JS: $n');
-					console.warn(e);
-				}";
 			}
 		}
 
@@ -133,7 +118,6 @@
 	</script>
 
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-	<meta name="referrer" content="no-referrer"/>
 
 	<script type="text/javascript">
 		Event.observe(window, 'load', function() {
@@ -156,6 +140,7 @@
 
 <div id="notify" class="notify"></div>
 <div id="cmdline" style="display : none"></div>
+<div id="headlines-tmp" style="display : none"></div>
 
 <div id="main" dojoType="dijit.layout.BorderContainer">
 
@@ -172,17 +157,16 @@
 <div id="toolbar" dojoType="dijit.layout.ContentPane" region="top">
 	<div id="main-toolbar" dojoType="dijit.Toolbar">
 
-		<?php
-		foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_MAIN_TOOLBAR_BUTTON) as $p) {
-			echo $p->hook_main_toolbar_button();
-		}
-		?>
-
 		<form id="headlines-toolbar" action="" onsubmit='return false'>
 
 		</form>
 
 		<form id="main_toolbar_form" action="" onsubmit='return false'>
+
+		<button dojoType="dijit.form.Button" id="collapse_feeds_btn"
+			onclick="collapse_feedlist()"
+			title="<?php echo __('Collapse feedlist') ?>" style="display : none">
+			&lt;&lt;</button>
 
 		<select name="view_mode" title="<?php echo __('Show articles') ?>"
 			onchange="viewModeChanged()"
@@ -192,6 +176,7 @@
 			<option value="marked"><?php echo __('Starred') ?></option>
 			<option value="published"><?php echo __('Published') ?></option>
 			<option value="unread"><?php echo __('Unread') ?></option>
+			<option value="unread_first"><?php echo __('Unread First') ?></option>
 			<option value="has_note"><?php echo __('With Note') ?></option>
 			<!-- <option value="noscores"><?php echo __('Ignore Scoring') ?></option> -->
 		</select>
@@ -232,8 +217,16 @@
 
 			<button id="net-alert" dojoType="dijit.form.Button" style="display : none" disabled="true"
 				title="<?php echo __("Communication problem with server.") ?>">
-				<img src="images/error.png" />
+			<img
+				src="images/error.png" />
 			</button>
+
+			<button id="newVersionIcon" dojoType="dijit.form.Button" style="display : none">
+			<img onclick="newVersionDlg()"
+				src="images/new_version.png"
+				title="<?php echo __('New version of Tiny Tiny RSS is available!') ?>" />
+			</button>
+
 
 			<div dojoType="dijit.form.DropDownButton">
 				<span><?php echo __('Actions...') ?></span>
@@ -250,6 +243,7 @@
 					<div dojoType="dijit.MenuItem" onclick="quickMenuGo('qmcShowOnlyUnread')"><?php echo __('(Un)hide read feeds') ?></div>
 					<div dojoType="dijit.MenuItem" disabled="1"><?php echo __('Other actions:') ?></div>
 					<div dojoType="dijit.MenuItem" onclick="quickMenuGo('qmcToggleWidescreen')"><?php echo __('Toggle widescreen mode') ?></div>
+					<div dojoType="dijit.MenuItem" onclick="quickMenuGo('qmcTagSelect')"><?php echo __('Select by tags...') ?></div>
 					<!-- <div dojoType="dijit.MenuItem" onclick="quickMenuGo('qmcAddLabel')"><?php echo __('Create label...') ?></div>
 					<div dojoType="dijit.MenuItem" onclick="quickMenuGo('qmcAddFilter')"><?php echo __('Create filter...') ?></div> -->
 					<div dojoType="dijit.MenuItem" onclick="quickMenuGo('qmcHKhelp')"><?php echo __('Keyboard shortcuts help') ?></div>
@@ -265,17 +259,13 @@
 					<?php } ?>
 				</div>
 			</div>
-
-			<button id="updatesIcon" dojoType="dijit.form.Button" style="display : none">
-				<img src="images/new_version.png" title="<?php echo __('Updates are available from Git.') ?>"/>
-			</button>
 		</div>
 	</div> <!-- toolbar -->
 </div> <!-- toolbar pane -->
 
 	<div id="headlines-wrap-inner" dojoType="dijit.layout.BorderContainer" region="center">
 
-		<div id="floatingTitle" style="visibility : hidden"></div>
+		<div id="floatingTitle" style="display : none"></div>
 
 		<div id="headlines-frame" dojoType="dijit.layout.ContentPane"
 				onscroll="headlines_scroll_handler(this)" region="center">

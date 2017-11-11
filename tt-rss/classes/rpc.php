@@ -123,7 +123,7 @@ class RPC extends Handler_Protected {
 		$key = $_REQUEST['key'];
 		$value = str_replace("\n", "<br/>", $_REQUEST['value']);
 
-		set_pref($key, $value, false, $key != 'USER_STYLESHEET');
+		set_pref($key, $value, $_SESSION['uid'], $key != 'USER_STYLESHEET');
 
 		print json_encode(array("param" =>$key, "value" => $value));
 	}
@@ -165,7 +165,7 @@ class RPC extends Handler_Protected {
 
 			$result = $this->dbh->query("SELECT feed_url,site_url,title FROM ttrss_archived_feeds
 				WHERE id = (SELECT orig_feed_id FROM ttrss_user_entries WHERE ref_id = $id
-				AND owner_uid = ".$_SESSION["uid"].") AND owner_uid = " . $_SESSION["uid"]);
+				AND owner_uid = ".$_SESSION["uid"].")");
 
 			if ($this->dbh->num_rows($result) != 0) {
 				$feed_url = $this->dbh->escape_string(db_fetch_result($result, 0, "feed_url"));
@@ -237,22 +237,17 @@ class RPC extends Handler_Protected {
 
 			if ($feed_id) {
 				$result = $this->dbh->query("SELECT id FROM ttrss_archived_feeds
-					WHERE id = '$feed_id' AND owner_uid = " . $_SESSION["uid"]);
+					WHERE id = '$feed_id'");
 
 				if ($this->dbh->num_rows($result) == 0) {
-					$result = db_query("SELECT MAX(id) AS id FROM ttrss_archived_feeds");
-					$new_feed_id = (int)db_fetch_result($result, 0, "id") + 1;
-
 					$this->dbh->query("INSERT INTO ttrss_archived_feeds
 						(id, owner_uid, title, feed_url, site_url)
-					SELECT $new_feed_id, owner_uid, title, feed_url, site_url from ttrss_feeds
+					SELECT id, owner_uid, title, feed_url, site_url from ttrss_feeds
 				  	WHERE id = '$feed_id'");
-				} else {
-					$new_feed_id = $this->dbh->fetch_result($result, 0, "id");
 				}
 
 				$this->dbh->query("UPDATE ttrss_user_entries
-					SET orig_feed_id = $new_feed_id, feed_id = NULL
+					SET orig_feed_id = feed_id, feed_id = NULL
 					WHERE ref_id = '$id' AND owner_uid = " . $_SESSION["uid"]);
 			}
 		}
@@ -281,7 +276,7 @@ class RPC extends Handler_Protected {
 				"/public.php?op=rss&id=-2&key=" .
 				get_feed_access_key(-2, false);
 
-			$p = new pubsubhubbub\publisher\Publisher(PUBSUBHUBBUB_HUB);
+			$p = new Publisher(PUBSUBHUBBUB_HUB);
 
 			$pubsub_result = $p->publish_update($rss_link);
 		}
@@ -346,7 +341,7 @@ class RPC extends Handler_Protected {
 
 		if ($reply['error']['code'] == 0) {
 			$reply['init-params'] = make_init_params();
-			$reply['runtime-info'] = make_runtime_info(true);
+			$reply['runtime-info'] = make_runtime_info();
 		}
 
 		print json_encode($reply);
@@ -384,8 +379,6 @@ class RPC extends Handler_Protected {
 	}
 
 	function updateFeedBrowser() {
-		if (defined('_DISABLE_FEED_BROWSER') && _DISABLE_FEED_BROWSER) return;
-
 		$search = $this->dbh->escape_string($_REQUEST["search"]);
 		$limit = $this->dbh->escape_string($_REQUEST["limit"]);
 		$mode = (int) $this->dbh->escape_string($_REQUEST["mode"]);
@@ -438,7 +431,7 @@ class RPC extends Handler_Protected {
 					if ($this->dbh->num_rows($result) == 0) {
 						$result = $this->dbh->query("INSERT INTO ttrss_feeds
 										(owner_uid,feed_url,title,cat_id,site_url)
-									VALUES ('".$_SESSION["uid"]."',
+									VALUES ('$id','".$_SESSION["uid"]."',
 									'$feed_url', '$title', NULL, '$site_url')");
 					}
 				}
@@ -450,10 +443,8 @@ class RPC extends Handler_Protected {
 		$feed_id = $this->dbh->escape_string($_REQUEST['feed_id']);
 		$is_cat = $this->dbh->escape_string($_REQUEST['is_cat']) == "true";
 		$mode = $this->dbh->escape_string($_REQUEST['mode']);
-		$search_query = $this->dbh->escape_string($_REQUEST['search_query']);
-		$search_lang = $this->dbh->escape_string($_REQUEST['search_lang']);
 
-		catchup_feed($feed_id, $is_cat, false, false, $mode, [$search_query, $search_lang]);
+		catchup_feed($feed_id, $is_cat, false, false, $mode);
 
 		print json_encode(array("message" => "UPDATE_COUNTERS"));
 	}
@@ -557,7 +548,7 @@ class RPC extends Handler_Protected {
 
 		// Purge orphans and cleanup tags
 		purge_orphans();
-		//cleanup_tags(14, 50000);
+		cleanup_tags(14, 50000);
 
 		if ($num_updated > 0) {
 			print json_encode(array("message" => "UPDATE_COUNTERS",
@@ -626,7 +617,7 @@ class RPC extends Handler_Protected {
 				"/public.php?op=rss&id=-2&key=" .
 				get_feed_access_key(-2, false);
 
-			$p = new pubsubhubbub\publisher\Publisher(PUBSUBHUBBUB_HUB);
+			$p = new Publisher(PUBSUBHUBBUB_HUB);
 
 			/* $pubsub_result = */ $p->publish_update($rss_link);
 		}
@@ -649,19 +640,14 @@ class RPC extends Handler_Protected {
 	}
 
 	function log() {
-		$msg = $this->dbh->escape_string($_REQUEST['msg']);
-		$file = $this->dbh->escape_string(basename($_REQUEST['file']));
-		$line = (int) $_REQUEST['line'];
-		$context = $this->dbh->escape_string($_REQUEST['context']);
+		$logmsg = $this->dbh->escape_string($_REQUEST['logmsg']);
 
-		if ($msg) {
+		if ($logmsg) {
 			Logger::get()->log_error(E_USER_WARNING,
-				$msg, 'client-js:' . $file, $line, $context);
-
-			echo json_encode(array("message" => "HOST_ERROR_LOGGED"));
-		} else {
-			echo json_encode(array("error" => "MESSAGE_NOT_FOUND"));
+				$logmsg, '[client-js]', 0, false);
 		}
+
+		echo json_encode(array("message" => "HOST_ERROR_LOGGED"));
 
 	}
 }

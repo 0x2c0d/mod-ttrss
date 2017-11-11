@@ -6,7 +6,6 @@ dependencies = {
 				"dojo._base.url",
 				"dojo.cache",
 				"dojo.dojo",
-				"dojo.dom-construct",
 				"dojo.parser",
 				"dojo.data.ItemFileWriteStore",
 				"dojo.selector.acme",

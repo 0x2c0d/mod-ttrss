@@ -1,43 +1,43 @@
-require(["dojo/_base/declare", "dojo/dom-construct", "lib/CheckBoxTree", "dijit/form/DropDownButton"], function (declare, domConstruct) {
+dojo.provide("fox.PrefLabelTree");
 
-	return declare("fox.PrefLabelTree", lib.CheckBoxTree, {
-		setNameById: function (id, name) {
-			var item = this.model.store._itemsByIdentity['LABEL:' + id];
+dojo.require("lib.CheckBoxTree");
+dojo.require("dijit.form.DropDownButton");
 
-			if (item)
-				this.model.store.setValue(item, 'name', name);
+dojo.declare("fox.PrefLabelTree", lib.CheckBoxTree, {
+	setNameById: function (id, name) {
+		var item = this.model.store._itemsByIdentity['LABEL:' + id];
 
-		},
-		_createTreeNode: function(args) {
-			var tnode = this.inherited(arguments);
+		if (item)
+			this.model.store.setValue(item, 'name', name);
 
-			var fg_color = this.model.store.getValue(args.item, 'fg_color');
-			var bg_color = this.model.store.getValue(args.item, 'bg_color');
-			var type = this.model.store.getValue(args.item, 'type');
-			var bare_id = this.model.store.getValue(args.item, 'bare_id');
+	},
+	_createTreeNode: function(args) {
+		var tnode = this.inherited(arguments);
 
-			if (type == 'label') {
-				var span = dojo.doc.createElement('span');
-				span.innerHTML = '&alpha;';
-				span.className = 'labelColorIndicator';
-				span.id = 'LICID-' + bare_id;
+		var fg_color = this.model.store.getValue(args.item, 'fg_color');
+		var bg_color = this.model.store.getValue(args.item, 'bg_color');
+		var type = this.model.store.getValue(args.item, 'type');
+		var bare_id = this.model.store.getValue(args.item, 'bare_id');
 
-				span.setStyle({
-					color: fg_color,
-					backgroundColor: bg_color});
+		if (type == 'label') {
+			var span = dojo.doc.createElement('span');
+			span.innerHTML = '&alpha;';
+			span.className = 'labelColorIndicator';
+			span.id = 'LICID-' + bare_id;
 
-				tnode._labelIconNode = span;
+			span.setStyle({
+				color: fg_color,
+				backgroundColor: bg_color});
 
-				domConstruct.place(tnode._labelIconNode, tnode.labelNode, 'before');
-			}
+			tnode._labelIconNode = span;
 
-			return tnode;
-		},
-		getIconClass: function (item, opened) {
-			return (!item || this.model.mayHaveChildren(item)) ? (opened ? "dijitFolderOpened" : "dijitFolderClosed") : "invisible";
-		},
-	});
+			dojo.place(tnode._labelIconNode, tnode.labelNode, 'before');
+		}
 
+		return tnode;
+	},
+	getIconClass: function (item, opened) {
+		return (!item || this.model.mayHaveChildren(item)) ? (opened ? "dijitFolderOpened" : "dijitFolderClosed") : "invisible";
+	},
 });
-
 

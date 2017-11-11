@@ -197,9 +197,9 @@ class Instances extends Plugin implements IHandler {
 		$result = db_query("SELECT * FROM ttrss_linked_instances WHERE
 			id = '$id'");
 
-		print_hidden("id", "$id");
-		print_hidden("op", "pref-instances");
-		print_hidden("method", "editSave");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\"  name=\"id\" value=\"$id\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\"  name=\"op\" value=\"pref-instances\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\"  name=\"method\" value=\"editSave\">";
 
 		print "<div class=\"dlgSec\">".__("Instance")."</div>";
 
@@ -226,7 +226,7 @@ class Instances extends Plugin implements IHandler {
 		print __("Access key:") . " ";
 
 		print "<input dojoType=\"dijit.form.ValidationTextBox\" required=\"1\"
-			placeHolder=\"".__("Access key")."\"
+			placeHolder=\"".__("Access key")."\" regExp='\w{40}'
 			style=\"width: 20em\" name=\"access_key\" id=\"instance_edit_key\"
 			value=\"$access_key\">";
 
@@ -384,13 +384,13 @@ class Instances extends Plugin implements IHandler {
 
 			print json_encode(array("feeds" => $feeds));
 		} else {
-			print error_json(6);
+			print json_encode(array("error" => array("code" => 6)));
 		}
 	}
 
 	function addInstance() {
-		print_hidden("op", "pref-instances");
-		print_hidden("method", "add");
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\"  name=\"op\" value=\"pref-instances\">";
+		print "<input dojoType=\"dijit.form.TextBox\" style=\"display : none\"  name=\"method\" value=\"add\">";
 
 		print "<div class=\"dlgSec\">".__("Instance")."</div>";
 
@@ -407,14 +407,14 @@ class Instances extends Plugin implements IHandler {
 
 		print "<hr/>";
 
-		$access_key = uniqid_short();
+		$access_key = uniqid(rand(), true);
 
 		/* Access key */
 
 		print __("Access key:") . " ";
 
 		print "<input dojoType=\"dijit.form.ValidationTextBox\" required=\"1\"
-			placeHolder=\"".__("Access key")."\"
+			placeHolder=\"".__("Access key")."\" regExp='\w{40}'
 			style=\"width: 20em\" name=\"access_key\" id=\"instance_add_key\"
 			value=\"$access_key\">";
 
@@ -439,7 +439,7 @@ class Instances extends Plugin implements IHandler {
 	}
 
 	function genHash() {
-		$hash = uniqid_short();
+		$hash = uniqid(base_convert(rand(), 10, 36));
 
 		print json_encode(array("hash" => $hash));
 	}

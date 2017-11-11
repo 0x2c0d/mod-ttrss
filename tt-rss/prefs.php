@@ -42,9 +42,9 @@
 	<?php if ($_SESSION["uid"]) {
 		$theme = get_pref( "USER_CSS_THEME", $_SESSION["uid"], false);
 		if ($theme && theme_valid("$theme")) {
-			echo stylesheet_tag(get_theme_path($theme));
+			echo stylesheet_tag("themes/$theme");
 		} else {
-			echo stylesheet_tag("themes/default.php");
+			echo stylesheet_tag("themes/default.css");
 		}
 	}
 	?>
@@ -53,17 +53,6 @@
 
 	<link rel="shortcut icon" type="image/png" href="images/favicon.png"/>
 	<link rel="icon" type="image/png" sizes="72x72" href="images/favicon-72px.png" />
-
-	<script>
-		dojoConfig = {
-			async: true,
-			cacheBust: new Date(),
-			packages: [
-				{ name: "lib", location: "../" },
-				{ name: "fox", location: "../../js" },
-			]
-		};
-	</script>
 
 	<?php
 	foreach (array("lib/prototype.js",
@@ -83,16 +72,11 @@
 
 		foreach (PluginHost::getInstance()->get_plugins() as $n => $p) {
 			if (method_exists($p, "get_prefs_js")) {
-				echo "try {";
 				echo JShrink\Minifier::minify($p->get_prefs_js());
-				echo "} catch (e) {
-				 	console.warn('failed to initialize plugin JS: $n');
-					console.warn(e);
-				}";
 			}
 		}
 
-		print get_minified_js(array("functions", "deprecated", "prefs"));
+		print get_minified_js(array("../lib/CheckBoxTree","functions", "deprecated", "prefs", "PrefFeedTree", "PrefFilterTree", "PrefLabelTree"));
 
 		init_js_translations();
 	?>

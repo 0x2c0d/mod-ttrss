@@ -25,11 +25,6 @@
 	// including PUSH, bookmarklets and browser integration will not work properly.
 
 	define('FEED_CRYPT_KEY', '');
-	// WARNING: mcrypt is deprecated in php 7.1. This directive exists for backwards
-	// compatibility with existing installs, new passwords are NOT going to be encrypted.
-	// Use update.php --decrypt-feeds to decrypt existing passwords in the database while
-	// mcrypt is still available.
-
 	// Key used for encryption of passwords for password-protected feeds
 	// in the database. A string of 24 random characters. If left blank, encryption
 	// is not used. Requires mcrypt functions.
@@ -146,6 +141,13 @@
 	// Default lifetime of a session (e.g. login) cookie. In seconds, 
 	// 0 means cookie will be deleted when browser closes.
 
+	define('SESSION_CHECK_ADDRESS', 1);
+	// Check client IP address when validating session:
+	// 0 - disable checking
+	// 1 - check first 3 octets of an address (recommended)
+	// 2 - check first 2 octets of an address
+	// 3 - check entire address
+
 	// *********************************
 	// *** Email and digest settings ***
 	// *********************************
@@ -175,9 +177,15 @@
 	// *** Other settings (less important) ***
 	// ***************************************
 
-	define('CHECK_FOR_UPDATES', true);
-	// Check for updates automatically if running Git version
- 
+	define('CHECK_FOR_NEW_VERSION', true);
+	// Check for new versions of tt-rss automatically.
+
+	define('DETECT_ARTICLE_LANGUAGE', false);
+	// Detect article language when updating feeds, presently this is only
+	// used for hyphenation. This may increase amount of CPU time used by 
+	// update processes, disable if necessary (i.e. you are being billed
+	// for CPU time).
+
 	define('ENABLE_GZIP_OUTPUT', false);
 	// Selectively gzip output to improve wire performance. This requires
 	// PHP Zlib extension on the server.
@@ -185,7 +193,7 @@
 	// if you experience weird errors and tt-rss failing to start, blank pages
 	// after login, or content encoding errors, disable it.
 
-	define('PLUGINS', 'auth_internal, note');
+	define('PLUGINS', 'auth_internal, note, updater');
 	// Comma-separated list of plugins to load automatically for all users.
 	// System plugins have to be specified here. Please enable at least one
 	// authentication plugin here (auth_*).

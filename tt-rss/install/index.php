@@ -8,7 +8,7 @@
 	textarea { font-size : 12px; }
 	</style>
 </head>
-<body class="claro">
+<body>
 
 <?php
 
@@ -39,8 +39,8 @@
 	function sanity_check($db_type) {
 		$errors = array();
 
-		if (version_compare(PHP_VERSION, '5.4.0', '<')) {
-			array_push($errors, "PHP version 5.4.0 or newer required.");
+		if (version_compare(PHP_VERSION, '5.3.0', '<')) {
+			array_push($errors, "PHP version 5.3.0 or newer required.");
 		}
 
 		if (!function_exists("curl_init") && !ini_get("allow_url_fopen")) {
@@ -51,7 +51,7 @@
 			array_push($errors, "PHP support for JSON is required, but was not found.");
 		}
 
-		if ($db_type == "mysql" && !function_exists("mysqli_connect")) {
+		if ($db_type == "mysql" && !function_exists("mysql_connect") && !function_exists("mysqli_connect")) {
 			array_push($errors, "PHP support for MySQL is required for configured $db_type in config.php.");
 		}
 
@@ -67,13 +67,17 @@
 			array_push($errors, "PHP support for hash() function is required but was not found.");
 		}
 
+		if (!function_exists("ctype_lower")) {
+			array_push($errors, "PHP support for ctype functions are required by HTMLPurifier.");
+		}
+
 		if (!function_exists("iconv")) {
 			array_push($errors, "PHP support for iconv is required to handle multiple charsets.");
 		}
 
-		if (ini_get("safe_mode")) {
-			array_push($errors, "PHP safe mode setting is obsolete and not supported by tt-rss.");
-		}
+		/* if (ini_get("safe_mode")) {
+			array_push($errors, "PHP safe mode setting is not supported.");
+		} */
 
 		if (!class_exists("DOMDocument")) {
 			array_push($errors, "PHP support for DOMDocument is required, but was not found.");
@@ -83,11 +87,13 @@
 	}
 
 	function print_error($msg) {
-		print "<div class='alert alert-error'>$msg</div>";
+		print "<div class='error'><span><img src='../images/alert.png'></span>
+			<span>$msg</span></div>";
 	}
 
 	function print_notice($msg) {
-		print "<div class=\"alert alert-info\">$msg</div>";
+		print "<div class=\"notice\">
+			<span><img src=\"../images/information.png\"></span><span>$msg</span></div>";
 	}
 
 	function db_connect($host, $user, $pass, $db, $type, $port = false) {
@@ -112,10 +118,19 @@
 			return $link;
 
 		} else if ($type == "mysql") {
-			if ($port)
-				return mysqli_connect($host, $user, $pass, $db, $port);
-			else
-				return mysqli_connect($host, $user, $pass, $db);
+			if (function_exists("mysqli_connect")) {
+				if ($port)
+					return mysqli_connect($host, $user, $pass, $db, $port);
+				else
+					return mysqli_connect($host, $user, $pass, $db);
+
+			} else {
+				$link = mysql_connect($host, $user, $pass);
+				if ($link) {
+					$result = mysql_select_db($db, $link);
+					if ($result) return $link;
+				}
+			}
 		}
 	}
 
@@ -127,6 +142,12 @@
 		$rv = "";
 
 		$finished = false;
+
+		if (function_exists("mcrypt_decrypt")) {
+			$crypt_key = make_password(24);
+		} else {
+			$crypt_key = "";
+		}
 
 		foreach ($data as $line) {
 			if (preg_match("/define\('DB_TYPE'/", $line)) {
@@ -143,6 +164,8 @@
 				$rv .= "\tdefine('DB_PORT', '$DB_PORT');\n";
 			} else if (preg_match("/define\('SELF_URL_PATH'/", $line)) {
 				$rv .= "\tdefine('SELF_URL_PATH', '$SELF_URL_PATH');\n";
+			} else if (preg_match("/define\('FEED_CRYPT_KEY'/", $line)) {
+				$rv .= "\tdefine('FEED_CRYPT_KEY', '$crypt_key');\n";
 			} else if (!$finished) {
 				$rv .= "$line\n";
 			}
@@ -167,12 +190,15 @@
 			return $result;
 		} else if ($type == "mysql") {
 
-			$result = mysqli_query($link, $query);
-
+			if (function_exists("mysqli_connect")) {
+				$result = mysqli_query($link, $query);
+			} else {
+				$result = mysql_query($query, $link);
+			}
 			if (!$result) {
 				$query = htmlspecialchars($query);
 				if ($die_on_error) {
-					die("Query <i>$query</i> failed: " . ($link ? mysqli_error($link) : "No connection"));
+					die("Query <i>$query</i> failed: " . ($link ? function_exists("mysqli_connect") ? mysqli_error($link) : mysql_error($link) : "No connection"));
 				}
 			}
 			return $result;
@@ -239,28 +265,28 @@
 
 <fieldset>
 	<label>Username</label>
-	<input class="input input-text" required name="DB_USER" size="20" value="<?php echo $DB_USER ?>"/>
+	<input required name="DB_USER" size="20" value="<?php echo $DB_USER ?>"/>
 </fieldset>
 
 <fieldset>
 	<label>Password</label>
-	<input class="input input-text" name="DB_PASS" size="20" type="password" value="<?php echo $DB_PASS ?>"/>
+	<input name="DB_PASS" size="20" type="password" value="<?php echo $DB_PASS ?>"/>
 </fieldset>
 
 <fieldset>
 	<label>Database name</label>
-	<input class="input input-text" required name="DB_NAME" size="20" value="<?php echo $DB_NAME ?>"/>
+	<input required name="DB_NAME" size="20" value="<?php echo $DB_NAME ?>"/>
 </fieldset>
 
 <fieldset>
 	<label>Host name</label>
-	<input class="input input-text" name="DB_HOST" size="20" value="<?php echo $DB_HOST ?>"/>
+	<input name="DB_HOST" size="20" value="<?php echo $DB_HOST ?>"/>
 	<span class="hint">If needed</span>
 </fieldset>
 
 <fieldset>
 	<label>Port</label>
-	<input class="input input-text" name="DB_PORT" type="number" size="20" value="<?php echo $DB_PORT ?>"/>
+	<input name="DB_PORT" type="number" size="20" value="<?php echo $DB_PORT ?>"/>
 	<span class="hint">Usually 3306 for MySQL or 5432 for PostgreSQL</span>
 </fieldset>
 
@@ -270,7 +296,7 @@
 
 <fieldset>
 	<label>Tiny Tiny RSS URL</label>
-	<input class="input input-text" type="url" name="SELF_URL_PATH" placeholder="<?php echo $SELF_URL_PATH; ?>" size="60" value="<?php echo $SELF_URL_PATH ?>"/>
+	<input type="url" name="SELF_URL_PATH" placeholder="<?php echo $SELF_URL_PATH; ?>" size="60" value="<?php echo $SELF_URL_PATH ?>"/>
 </fieldset>
 
 
@@ -303,14 +329,6 @@
 
 		if (!function_exists("curl_init")) {
 			array_push($notices, "It is highly recommended to enable support for CURL in PHP.");
-		}
-
-		if (function_exists("curl_init") && ini_get("open_basedir")) {
-			array_push($notices, "CURL and open_basedir combination breaks support for HTTP redirects. See the FAQ for more information.");
-		}
-
-		if (!function_exists("idn_to_ascii")) {
-			array_push($notices, "PHP support for Internationalization Functions is required to handle Internationalized Domain Names.");
 		}
 
 		if (count($notices) > 0) {

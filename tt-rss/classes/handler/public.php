@@ -2,7 +2,7 @@
 class Handler_Public extends Handler {
 
 	private function generate_syndicated_feed($owner_uid, $feed, $is_cat,
-		$limit, $offset, $search,
+		$limit, $offset, $search, $search_mode,
 		$view_mode = false, $format = 'atom', $order = false, $orig_guid = false, $start_ts = false) {
 
 		require_once "lib/MiniTemplator.class.php";
@@ -37,31 +37,12 @@ class Handler_Public extends Handler {
 			break;
 		}
 
-		/*$qfh_ret = queryFeedHeadlines($feed,
-			1, $view_mode, $is_cat, $search, false,
+		//function queryFeedHeadlines($feed, $limit, $view_mode, $cat_view, $search, $search_mode, $override_order = false, $offset = 0, $owner_uid = 0, $filter = false, $since_id = 0, $include_children = false, $ignore_vfeed_group = false, $override_strategy = false, $override_vfeed = false, $start_ts = false) {
+
+		$qfh_ret = queryFeedHeadlines($feed,
+			1, $view_mode, $is_cat, $search, $search_mode,
 			$date_sort_field, $offset, $owner_uid,
-			false, 0, true, true, false, false, $start_ts);*/
-
-		//function queryFeedHeadlines($feed,
-		// $limit, $view_mode, $cat_view, $search, $search_mode,
-		// $override_order = false, $offset = 0, $owner_uid = 0,
-		// $filter = false, $since_id = 0, $include_children = false, $ignore_vfeed_group = false, $override_strategy = false, $override_vfeed = false, $start_ts = false, $check_top_id = false) {
-
-		$params = array(
-			"owner_uid" => $owner_uid,
-			"feed" => $feed,
-			"limit" => 1,
-			"view_mode" => $view_mode,
-			"cat_view" => $is_cat,
-			"search" => $search,
-			"override_order" => $date_sort_field,
-			"include_children" => true,
-			"ignore_vfeed_group" => true,
-			"offset" => $offset,
-			"start_ts" => $start_ts
-		);
-
-		$qfh_ret = queryFeedHeadlines($params);
+			false, 0, true, true, false, false, $start_ts);
 
 		$result = $qfh_ret[0];
 
@@ -79,26 +60,11 @@ class Handler_Public extends Handler {
 			header("Last-Modified: $last_modified", true);
 		}
 
-		/*$qfh_ret = queryFeedHeadlines($feed,
-			$limit, $view_mode, $is_cat, $search, false,
+		$qfh_ret = queryFeedHeadlines($feed,
+			$limit, $view_mode, $is_cat, $search, $search_mode,
 			$date_sort_field, $offset, $owner_uid,
-			false, 0, true, true, false, false, $start_ts);*/
+			false, 0, true, true, false, false, $start_ts);
 
-		$params = array(
-			"owner_uid" => $owner_uid,
-			"feed" => $feed,
-			"limit" => $limit,
-			"view_mode" => $view_mode,
-			"cat_view" => $is_cat,
-			"search" => $search,
-			"override_order" => $date_sort_field,
-			"include_children" => true,
-			"ignore_vfeed_group" => true,
-			"offset" => $offset,
-			"start_ts" => $start_ts
-		);
-
-		$qfh_ret = queryFeedHeadlines($params);
 
 		$result = $qfh_ret[0];
 		$feed_title = htmlspecialchars($qfh_ret[1]);
@@ -127,26 +93,22 @@ class Handler_Public extends Handler {
 
 			$tpl->setVariable('SELF_URL', htmlspecialchars(get_self_url_prefix()), true);
 			while ($line = $this->dbh->fetch_assoc($result)) {
-
-				$line["content_preview"] = sanitize(truncate_string(strip_tags($line["content"]), 100, '...'));
+				$line["content_preview"] = truncate_string(strip_tags($line["content"]), 100, '...');
 
 				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
 					$line = $p->hook_query_headlines($line);
 				}
 
-				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_ARTICLE_EXPORT_FEED) as $p) {
-					$line = $p->hook_article_export_feed($line, $feed, $is_cat);
-				}
-
 				$tpl->setVariable('ARTICLE_ID',
 					htmlspecialchars($orig_guid ? $line['link'] :
-							$this->make_article_tag_uri($line['id'], $line['date_entered'])), true);
+						get_self_url_prefix() .
+							"/public.php?url=" . urlencode($line['link'])), true);
 				$tpl->setVariable('ARTICLE_LINK', htmlspecialchars($line['link']), true);
 				$tpl->setVariable('ARTICLE_TITLE', htmlspecialchars($line['title']), true);
 				$tpl->setVariable('ARTICLE_EXCERPT', $line["content_preview"], true);
 
 				$content = sanitize($line["content"], false, $owner_uid,
-					$feed_site_url, false, $line["id"]);
+					$feed_site_url);
 
 				if ($line['note']) {
 					$content = "<div style=\"$note_style\">Article note: " . $line['note'] . "</div>" .
@@ -163,7 +125,7 @@ class Handler_Public extends Handler {
 
 				$tpl->setVariable('ARTICLE_AUTHOR', htmlspecialchars($line['author']), true);
 
-				$tpl->setVariable('ARTICLE_SOURCE_LINK', htmlspecialchars($line['site_url'] ? $line["site_url"] : get_self_url_prefix()), true);
+				$tpl->setVariable('ARTICLE_SOURCE_LINK', htmlspecialchars($line['site_url']), true);
 				$tpl->setVariable('ARTICLE_SOURCE_TITLE', htmlspecialchars($line['feed_title'] ? $line['feed_title'] : $feed_title), true);
 
 				$tags = get_article_tags($line["id"], $owner_uid);
@@ -178,7 +140,7 @@ class Handler_Public extends Handler {
 				foreach ($enclosures as $e) {
 					$type = htmlspecialchars($e['content_type']);
 					$url = htmlspecialchars($e['content_url']);
-					$length = $e['duration'] ? $e['duration'] : 1;
+					$length = $e['duration'];
 
 					$tpl->setVariable('ARTICLE_ENCLOSURE_URL', $url, true);
 					$tpl->setVariable('ARTICLE_ENCLOSURE_TYPE', $type, true);
@@ -219,24 +181,17 @@ class Handler_Public extends Handler {
 			$feed['articles'] = array();
 
 			while ($line = $this->dbh->fetch_assoc($result)) {
-
-				$line["content_preview"] = sanitize(truncate_string(strip_tags($line["content_preview"]), 100, '...'));
-
+				$line["content_preview"] = truncate_string(strip_tags($line["content_preview"]), 100, '...');
 				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_QUERY_HEADLINES) as $p) {
 					$line = $p->hook_query_headlines($line, 100);
 				}
-
-				foreach (PluginHost::getInstance()->get_hooks(PluginHost::HOOK_ARTICLE_EXPORT_FEED) as $p) {
-					$line = $p->hook_article_export_feed($line, $feed, $is_cat);
-				}
-
 				$article = array();
 
 				$article['id'] = $line['link'];
 				$article['link']	= $line['link'];
 				$article['title'] = $line['title'];
 				$article['excerpt'] = $line["content_preview"];
-				$article['content'] = sanitize($line["content"], false, $owner_uid, $feed_site_url, false, $line["id"]);
+				$article['content'] = sanitize($line["content"], false, $owner_uid);
 				$article['updated'] = date('c', strtotime($line["updated"]));
 
 				if ($line['note']) $article['note'] = $line['note'];
@@ -420,6 +375,7 @@ class Handler_Public extends Handler {
 		$offset = (int)$this->dbh->escape_string($_REQUEST["offset"]);
 
 		$search = $this->dbh->escape_string($_REQUEST["q"]);
+		$search_mode = $this->dbh->escape_string($_REQUEST["smode"]);
 		$view_mode = $this->dbh->escape_string($_REQUEST["view-mode"]);
 		$order = $this->dbh->escape_string($_REQUEST["order"]);
 		$start_ts = $this->dbh->escape_string($_REQUEST["ts"]);
@@ -445,7 +401,7 @@ class Handler_Public extends Handler {
 
 		if ($owner_id) {
 			$this->generate_syndicated_feed($owner_id, $feed, $is_cat, $limit,
-				$offset, $search, $view_mode, $format, $order, $orig_guid, $start_ts);
+				$offset, $search, $search_mode, $view_mode, $format, $order, $orig_guid, $start_ts);
 		} else {
 			header('HTTP/1.1 403 Forbidden');
 		}
@@ -544,7 +500,7 @@ class Handler_Public extends Handler {
 					</div>
 					<button type="submit"><?php echo __('Share') ?></button>
 					<button onclick="return window.close()"><?php echo __('Cancel') ?></button>
-					</td>
+					</div>
 
 				</form>
 				</td></tr></table>
@@ -751,7 +707,7 @@ class Handler_Public extends Handler {
 
 	function index() {
 		header("Content-Type: text/plain");
-		print error_json(13);
+		print json_encode(array("error" => array("code" => 7)));
 	}
 
 	function forgotpass() {
@@ -980,7 +936,7 @@ class Handler_Public extends Handler {
 						for ($i = $updater->getSchemaVersion() + 1; $i <= SCHEMA_VERSION; $i++) {
 							print "<li>Performing update up to version $i...";
 
-							$result = $updater->performUpdateTo($i, true);
+							$result = $updater->performUpdateTo($i);
 
 							if (!$result) {
 								print "<span class='err'>FAILED!</span></li></ul>";
@@ -990,7 +946,7 @@ class Handler_Public extends Handler {
 								<input type=\"submit\" value=\"".__("Return to Tiny Tiny RSS")."\">
 								</form>";
 
-								return;
+								break;
 							} else {
 								print "<span class='ok'>OK!</span></li>";
 							}
@@ -1016,10 +972,10 @@ class Handler_Public extends Handler {
 
 						print "<h2>Database update required</h2>";
 
-						print_notice("<h4>".
-						sprintf("Your Tiny Tiny RSS database needs update to the latest version: %d to %d.",
-							$updater->getSchemaVersion(), SCHEMA_VERSION).
-						"</h4>");
+						print "<h3>";
+						printf("Your Tiny Tiny RSS database needs update to the latest version: %d to %d.",
+							$updater->getSchemaVersion(), SCHEMA_VERSION);
+						print "</h3>";
 
 						print_warning("Please backup your database before proceeding.");
 
@@ -1046,80 +1002,5 @@ class Handler_Public extends Handler {
 		<?php
 	}
 
-	function cached_url() {
-		@$hash = basename($_GET['hash']);
-
-		// we don't need an extension to find the file, hash is a complete URL
-		$hash = preg_replace("/\.[^\.]*$/", "", $hash);
-
-		if ($hash) {
-
-			$filename = CACHE_DIR . '/images/' . $hash;
-
-			if (file_exists($filename)) {
-				header("Content-Disposition: inline; filename=\"$hash\"");
-				$mimetype = mime_content_type($filename);
-
-				/* See if we can use X-Sendfile */
-				$xsendfile = false;
-				if (function_exists('apache_get_modules') &&
-				    array_search('mod_xsendfile', apache_get_modules()))
-					$xsendfile = true;
-
-				if ($xsendfile) {
-					header("X-Sendfile: $filename");
-					header("Content-type: $mimetype");
-					header('Content-Disposition: inline; filename="' . basename($filename) . '"');
-				} else {
-					header("Content-type: $mimetype");
-					$stamp = gmdate("D, d M Y H:i:s", filemtime($filename)). " GMT";
-					header("Last-Modified: $stamp", true);
-					readfile($filename);
-				}
-			} else {
-				header($_SERVER["SERVER_PROTOCOL"]." 404 Not Found");
-				echo "File not found.";
-			}
-		}
-	}
-
-	private function make_article_tag_uri($id, $timestamp) {
-
-		$timestamp = date("Y-m-d", strtotime($timestamp));
-
-		return "tag:" . parse_url(get_self_url_prefix(), PHP_URL_HOST) . ",$timestamp:/$id";
-	}
-
-	// this should be used very carefully because this endpoint is exposed to unauthenticated users
-	// plugin data is not loaded because there's no user context and owner_uid/session may or may not be available
-	// in general, don't do anything user-related in here and do not modify $_SESSION
-	public function pluginhandler() {
-		$host = new PluginHost();
-
-		$plugin = basename($_REQUEST["plugin"]);
-		$method = $_REQUEST["pmethod"];
-
-		$host->load($plugin, PluginHost::KIND_USER, 0);
-		$host->load_data();
-
-		$pclass = $host->get_plugin($plugin);
-
-		if ($pclass) {
-			if (method_exists($pclass, $method)) {
-				if ($pclass->is_public_method($method)) {
-					$pclass->$method();
-				} else {
-					header("Content-Type: text/json");
-					print error_json(6);
-				}
-			} else {
-				header("Content-Type: text/json");
-				print error_json(13);
-			}
-		} else {
-			header("Content-Type: text/json");
-			print error_json(14);
-		}
-	}
 }
 ?>

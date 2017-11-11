@@ -1,7 +1,6 @@
 <?php
 class Db_Pgsql implements IDb {
 	private $link;
-	private $last_error;
 
 	function connect($host, $user, $pass, $db, $port) {
 		$string = "dbname=$db user=$user";
@@ -39,11 +38,11 @@ class Db_Pgsql implements IDb {
 		$result = @pg_query($this->link, $query);
 
 		if (!$result) {
-			$this->last_error = @pg_last_error($this->link);
+			$error = @pg_last_error($this->link);
 
 			@pg_query($this->link, "ROLLBACK");
 			$query = htmlspecialchars($query); // just in case
-			user_error("Query $query failed: " . ($this->link ? $this->last_error : "No connection"),
+			user_error("Query $query failed: " . ($this->link ? $error : "No connection"),
 				$die_on_error ? E_USER_ERROR : E_USER_WARNING);
 		}
 		return $result;
@@ -74,16 +73,11 @@ class Db_Pgsql implements IDb {
 		return pg_last_error($this->link);
 	}
 
-	function last_query_error() {
-		return $this->last_error;
-	}
-
 	function init() {
 		$this->query("set client_encoding = 'UTF-8'");
 		pg_set_client_encoding("UNICODE");
 		$this->query("set datestyle = 'ISO, european'");
 		$this->query("set TIME ZONE 0");
-		$this->query("set cpu_tuple_cost = 0.5");
 
 		return true;
 	}

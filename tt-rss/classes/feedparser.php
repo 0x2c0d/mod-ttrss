@@ -15,11 +15,7 @@ class FeedParser {
 
 	function normalize_encoding($data) {
 		if (preg_match('/^(<\?xml[\t\n\r ].*?encoding[\t\n\r ]*=[\t\n\r ]*["\'])(.+?)(["\'].*?\?>)/s', $data, $matches) === 1) {
-
-			$encoding = strtolower($matches[2]);
-
-			if (in_array($encoding, array_map('strtolower', mb_list_encodings())))
-				$data = mb_convert_encoding($data, 'UTF-8', $encoding);
+			$data = mb_convert_encoding($data, 'UTF-8', $matches[2]);
 
 			$data = preg_replace('/^<\?xml[\t\n\r ].*?\?>/s', $matches[1] . "UTF-8" . $matches[3] , $data);
 		}
@@ -119,7 +115,6 @@ class FeedParser {
 					$this->type = $this::FEED_RSS;
 					break;
 				case "feed":
-				case "atom:feed":
 					$this->type = $this::FEED_ATOM;
 					break;
 				default:
@@ -146,13 +141,8 @@ class FeedParser {
 				$link = $xpath->query("//atom:feed/atom:link[not(@rel)]")->item(0);
 
 				if (!$link)
-					$link = $xpath->query("//atom:feed/atom:link[@rel='alternate']")->item(0);
-
-				if (!$link)
 					$link = $xpath->query("//atom03:feed/atom03:link[not(@rel)]")->item(0);
 
-				if (!$link)
-					$link = $xpath->query("//atom03:feed/atom03:link[@rel='alternate']")->item(0);
 
 				if ($link && $link->hasAttributes()) {
 					$this->link = $link->getAttribute("href");

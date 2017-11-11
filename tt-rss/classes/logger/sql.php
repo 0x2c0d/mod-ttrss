@@ -8,7 +8,8 @@ class Logger_SQL {
 			$errstr = Db::get()->escape_string($errstr);
 			$file = Db::get()->escape_string($file);
 			$line = Db::get()->escape_string($line);
-			$context = DB::get()->escape_string($context);
+			$context = ''; // backtrace is a lot of data which is not really critical to store
+			//$context = $this->dbh->escape_string(serialize($context));
 
 			$owner_uid = $_SESSION["uid"] ? $_SESSION["uid"] : "NULL";
 

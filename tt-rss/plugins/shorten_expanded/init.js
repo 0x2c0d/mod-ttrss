@@ -1,4 +1,4 @@
-var _shorten_expanded_threshold = 1.5; //window heights
+var _shorten_expanded_threshold = 900; //px, longer than css height so that we would only clip articles significantly longer than limit
 
 function expandSizeWrapper(id) {
 	try {
@@ -22,30 +22,24 @@ function expandSizeWrapper(id) {
 
 }
 
-require(['dojo/_base/kernel', 'dojo/ready'], function  (dojo, ready) {
+dojo.addOnLoad(function() {
+	PluginHost.register(PluginHost.HOOK_ARTICLE_RENDERED_CDM, function(row) {
+		if (getInitParam('cdm_expanded')) {
 
-	ready(function() {
-		PluginHost.register(PluginHost.HOOK_ARTICLE_RENDERED_CDM, function(row) {
-			if (getInitParam('cdm_expanded')) {
+			window.setTimeout(function() {
+				if (row) {
+					if (row.offsetHeight >= _shorten_expanded_threshold) {
+						var content = row.select(".cdmContentInner")[0];
 
-				window.setTimeout(function() {
-					if (row) {
-						if (row.offsetHeight >= _shorten_expanded_threshold * window.innerHeight) {
-							var content = row.select(".cdmContentInner")[0];
+						if (content) {
+							content.innerHTML = "<div class='contentSizeWrapper'>" +
+								content.innerHTML + "</div><button class='expandPrompt' onclick='return expandSizeWrapper(\""+row.id+"\")' "+
+								"href='#'>" + __("Click to expand article") + "</button>";
 
-							if (content) {
-								content.innerHTML = "<div class='contentSizeWrapper'>" +
-									content.innerHTML + "</div><button class='expandPrompt' onclick='return expandSizeWrapper(\""+row.id+"\")' "+
-									"href='#'>" + __("Click to expand article") + "</button>";
-
-							}
 						}
 					}
-				}, 150);
-			}
-
-			return true;
-		});
+				}
+			}, 150);
+		}
 	});
-
 });

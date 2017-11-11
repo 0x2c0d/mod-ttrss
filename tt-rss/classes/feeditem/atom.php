@@ -75,7 +75,7 @@ class FeedItem_Atom extends FeedItem_Common {
 				}
 			}
 
-			return $this->subtree_or_text($content);
+			return $content->nodeValue;
 		}
 	}
 
@@ -95,7 +95,7 @@ class FeedItem_Atom extends FeedItem_Common {
 				}
 			}
 
-			return $this->subtree_or_text($content);
+			return $content->nodeValue;
 		}
 
 	}

@@ -56,5 +56,6 @@
 	}
 
 	header("Content-Type: text/plain");
-	print error_json(13);
+	print json_encode(array("error" => array("code" => 7)));
+
 ?>

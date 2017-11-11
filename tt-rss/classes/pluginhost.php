@@ -8,7 +8,6 @@ class PluginHost {
 	private $storage = array();
 	private $feeds = array();
 	private $api_methods = array();
-	private $plugin_actions = array();
 	private $owner_uid;
 	private $debug;
 	private $last_registered;
@@ -16,16 +15,13 @@ class PluginHost {
 
 	const API_VERSION = 2;
 
-	// Hooks marked with *1 are run in global context and available
-	// to plugins loaded in config.php only
-
 	const HOOK_ARTICLE_BUTTON = 1;
 	const HOOK_ARTICLE_FILTER = 2;
 	const HOOK_PREFS_TAB = 3;
 	const HOOK_PREFS_TAB_SECTION = 4;
 	const HOOK_PREFS_TABS = 5;
 	const HOOK_FEED_PARSED = 6;
-	const HOOK_UPDATE_TASK = 7; // *1
+	const HOOK_UPDATE_TASK = 7;
 	const HOOK_AUTH_USER = 8;
 	const HOOK_HOTKEY_MAP = 9;
 	const HOOK_RENDER_ARTICLE = 10;
@@ -42,16 +38,11 @@ class PluginHost {
 	const HOOK_PREFS_SAVE_FEED = 21;
 	const HOOK_FETCH_FEED = 22;
 	const HOOK_QUERY_HEADLINES = 23;
-	const HOOK_HOUSE_KEEPING = 24; // *1
+	const HOOK_HOUSE_KEEPING = 24;
 	const HOOK_SEARCH = 25;
 	const HOOK_FORMAT_ENCLOSURES = 26;
 	const HOOK_SUBSCRIBE_FEED = 27;
 	const HOOK_HEADLINES_BEFORE = 28;
-	const HOOK_RENDER_ENCLOSURE = 29;
-	const HOOK_ARTICLE_FILTER_ACTION = 30;
-	const HOOK_ARTICLE_EXPORT_FEED = 31;
-	const HOOK_MAIN_TOOLBAR_BUTTON = 32;
-	const HOOK_ENCLOSURE_ENTRY = 33;
 
 	const KIND_ALL = 1;
 	const KIND_SYSTEM = 2;
@@ -103,7 +94,7 @@ class PluginHost {
 	}
 
 	function get_plugin($name) {
-		return $this->plugins[strtolower($name)];
+		return $this->plugins[$name];
 	}
 
 	function run_hooks($type, $method, $args) {
@@ -136,18 +127,12 @@ class PluginHost {
 			return array();
 		}
 	}
-	function load_all($kind, $owner_uid = false, $skip_init = false) {
-
-		$plugins = array_merge(glob("plugins/*"), glob("plugins.local/*"));
-		$plugins = array_filter($plugins, "is_dir");
-		$plugins = array_map("basename", $plugins);
-
-		asort($plugins);
-
-		$this->load(join(",", $plugins), $kind, $owner_uid, $skip_init);
+	function load_all($kind, $owner_uid = false) {
+		$plugins = array_map("basename", glob("plugins/*"));
+		$this->load(join(",", $plugins), $kind, $owner_uid);
 	}
 
-	function load($classlist, $kind, $owner_uid = false, $skip_init = false) {
+	function load($classlist, $kind, $owner_uid = false) {
 		$plugins = explode(",", $classlist);
 
 		$this->owner_uid = (int) $owner_uid;
@@ -156,15 +141,9 @@ class PluginHost {
 			$class = trim($class);
 			$class_file = strtolower(basename($class));
 
-			if (!is_dir(__DIR__."/../plugins/$class_file") &&
-					!is_dir(__DIR__."/../plugins.local/$class_file")) continue;
+			if (!is_dir(dirname(__FILE__)."/../plugins/$class_file")) continue;
 
-			// try system plugin directory first
-			$file = __DIR__ . "/../plugins/$class_file/init.php";
-
-			if (!file_exists($file)) {
-				$file = __DIR__ . "/../plugins.local/$class_file/init.php";
-			}
+			$file = dirname(__FILE__)."/../plugins/$class_file/init.php";
 
 			if (!isset($this->plugins[$class])) {
 				if (file_exists($file)) require_once $file;
@@ -184,18 +163,18 @@ class PluginHost {
 					switch ($kind) {
 					case $this::KIND_SYSTEM:
 						if ($this->is_system($plugin)) {
-							if (!$skip_init) $plugin->init($this);
+							$plugin->init($this);
 							$this->register_plugin($class, $plugin);
 						}
 						break;
 					case $this::KIND_USER:
 						if (!$this->is_system($plugin)) {
-							if (!$skip_init) $plugin->init($this);
+							$plugin->init($this);
 							$this->register_plugin($class, $plugin);
 						}
 						break;
 					case $this::KIND_ALL:
-						if (!$skip_init) $plugin->init($this);
+						$plugin->init($this);
 						$this->register_plugin($class, $plugin);
 						break;
 					}
@@ -419,20 +398,6 @@ class PluginHost {
 
 	function get_api_method($name) {
 		return $this->api_methods[$name];
-	}
-
-	function add_filter_action($sender, $action_name, $action_desc) {
-		$sender_class = get_class($sender);
-
-		if (!isset($this->plugin_actions[$sender_class]))
-			$this->plugin_actions[$sender_class] = array();
-
-		array_push($this->plugin_actions[$sender_class],
-			array("action" => $action_name, "description" => $action_desc, "sender" => $sender));
-	}
-
-	function get_filter_actions() {
-		return $this->plugin_actions;
 	}
 }
 ?>

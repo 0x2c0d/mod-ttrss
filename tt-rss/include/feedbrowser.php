@@ -1,8 +1,6 @@
 <?php
 	function make_feed_browser($search, $limit, $mode = 1) {
 
-		if (defined('_DISABLE_FEED_BROWSER') && _DISABLE_FEED_BROWSER) return;
-
 		$owner_uid = $_SESSION["uid"];
 		$rv = '';
 
@@ -59,12 +57,12 @@
 
 				$class = ($feedctr % 2) ? "even" : "odd";
 
-				$site_url = "<a target=\"_blank\" rel=\"noopener noreferrer\"
+				$site_url = "<a target=\"_blank\"
 							href=\"$site_url\">
 							<span class=\"fb_feedTitle\">".
 				htmlspecialchars($line["title"])."</span></a>";
 
-				$feed_url = "<a target=\"_blank\" rel=\"noopener noreferrer\" class=\"fb_feedUrl\"
+				$feed_url = "<a target=\"_blank\" class=\"fb_feedUrl\"
 							href=\"$feed_url\"><img src='images/pub_set.png'
 							style='vertical-align : middle'></a>";
 
@@ -81,18 +79,18 @@
 				$class = ($feedctr % 2) ? "even" : "odd";
 
 				if ($line['articles_archived'] > 0) {
-					$archived = sprintf(_ngettext("%d archived article", "%d archived articles", (int) $line['articles_archived']), $line['articles_archived']);
+					$archived = sprintf(_ngettext("%d archived article", "%d archived articles", $line['articles_archived']), $line['articles_archived']);
 					$archived = "&nbsp;<span class='subscribers'>($archived)</span>";
 				} else {
 					$archived = '';
 				}
 
-				$site_url = "<a target=\"_blank\" rel=\"noopener noreferrer\"
+				$site_url = "<a target=\"_blank\"
 							href=\"$site_url\">
 							<span class=\"fb_feedTitle\">".
 				htmlspecialchars($line["title"])."</span></a>";
 
-				$feed_url = "<a target=\"_blank\" rel=\"noopener noreferrer\" class=\"fb_feedUrl\"
+				$feed_url = "<a target=\"_blank\" class=\"fb_feedUrl\"
 							href=\"$feed_url\"><img src='images/pub_set.png'
 							style='vertical-align : middle'></a>";
 

@@ -30,7 +30,7 @@ class DbUpdater {
 		}
 	}
 
-	function performUpdateTo($version, $html_output = true) {
+	function performUpdateTo($version) {
 		if ($this->getSchemaVersion() == $version - 1) {
 
 			$lines = $this->getSchemaLines($version);
@@ -41,17 +41,7 @@ class DbUpdater {
 
 				foreach ($lines as $line) {
 					if (strpos($line, "--") !== 0 && $line) {
-						if (!db_query($line, false)) {
-							if ($html_output) {
-								print_notice("Query: $line");
-								print_error("Error: " . db_last_query_error());
-							} else {
-								_debug("Query: $line");
-								_debug("Error: " . db_last_query_error());
-							}
-
-							return false;
-						}
+						db_query($line);
 					}
 				}
 
